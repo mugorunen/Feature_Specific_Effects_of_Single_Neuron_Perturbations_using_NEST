@@ -2,6 +2,8 @@ import numpy as np
 import elephant.statistics as es
 from quantities import ms
 import neo
+from scipy.signal import convolve2d
+from scipy.signal import convolve
 import nest
 
 class NetworkAnalyzer:
@@ -102,4 +104,27 @@ class NetworkAnalyzer:
 
 
         return hist_counts_all, bin_centers, avg_hist_counts, average_firing_rate, firing_rates_smoothed
+    
+    def smoothing_kernel(self, mean_hist):
+        # Define the smoothing kernel (e.g., Gaussian kernel)
+        kernel_size = 5  # Adjust the size of the kernel as needed
+        sigma = 1.0      # Adjust the sigma parameter for Gaussian distribution
+        kernel = np.exp(-(np.arange(-kernel_size//2, kernel_size//2 + 1)**2) / (2*sigma**2))
+        kernel /= np.sum(kernel)  # Normalize the kernel so that the sum is 1
+
+        # Apply zero-padding to the data
+        padded_data = np.pad(mean_hist, (kernel_size//2, kernel_size//2), mode='edge')
+
+        # Apply convolution to smooth the padded data
+        smoothed_padded_data = convolve(padded_data, kernel, mode='valid')
+
+        # The size of 'smoothed_padded_data' is smaller than the original 'data' due to valid convolution
+        # If you want to keep the size the same, you can add zero-padding to the smoothed result
+
+        # Add zero-padding to the smoothed data to match the original size
+        padding = (kernel_size - 1) // 2
+        smoothed_data = np.pad(smoothed_padded_data, (padding, padding), mode='constant')
+        
+        return smoothed_data
+
 

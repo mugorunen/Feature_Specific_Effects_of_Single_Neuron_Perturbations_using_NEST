@@ -16,7 +16,7 @@ import nest.raster_plot
 
 
 simtime = 10000.0  # Simulation time in ms
-order = 1000
+order = 500
 
 # Define Simulation Parameters
 bin_width = 200.0
@@ -216,66 +216,49 @@ def run_sim(random_seed, plotting_flag):
 
 
 
-    return np.array(average_firing_rate_exc_elep), bin_centers_exc, avg_hist_counts_exc
+    return bin_centers_exc, avg_hist_counts_exc, avg_hist_counts_inh
 
 
 
 analyzer = NetworkAnalyzer(NE, NI, N_neurons, simtime, bin_width)
 m_plot = PlottingFuncs(N_neurons, simtime, bin_width, CE, CI)
 
-plotting_flag = True
-ff_1, bin_centers, hist_mean_1 = run_sim(1*123, plotting_flag)
-#ff_2, bin_centers, hist_mean_2 = run_sim(2*123)
-#ff_3, bin_centers, hist_mean_3 = run_sim(3*123)
-#ff_4, bin_centers, hist_mean_4 = run_sim(4*123)
-#ff_5, bin_centers, hist_mean_5 = run_sim(5*123)
-#ff_6, bin_centers, hist_mean_6 = run_sim(6*123)
-#ff_7, bin_centers, hist_mean_7 = run_sim(7*123)
-#ff_8, bin_centers, hist_mean_8 = run_sim(8*123)
-#ff_9, bin_centers, hist_mean_9 = run_sim(9*123)
-#upp_new = np.hstack((ff_1, ff_2, ff_3))
-#hist_new = np.column_stack((hist_mean_1, hist_mean_2, hist_mean_3))
-#upp_new = np.hstack((ff_1, ff_2, ff_3, ff_4, ff_5, ff_6, ff_7, ff_8, ff_9))
-#hist_new = np.column_stack((hist_mean_1, hist_mean_2, hist_mean_3, hist_mean_4, hist_mean_5, hist_mean_6, hist_mean_7, hist_mean_8, hist_mean_9))
-#mean_hist = hist_new.mean(axis=1)
-#print(type(hist_new.mean(axis=1)))
-#print(hist_new.mean(axis=1).shape)
-#print(ff_2.shape)
-#print(ff_3.shape)
-#
-## Define the smoothing kernel (e.g., Gaussian kernel)
-#kernel_size = 5  # Adjust the size of the kernel as needed
-#sigma = 1.0      # Adjust the sigma parameter for Gaussian distribution
-#kernel = np.exp(-(np.arange(-kernel_size//2, kernel_size//2 + 1)**2) / (2*sigma**2))
-#kernel /= np.sum(kernel)  # Normalize the kernel so that the sum is 1
-#
-## Apply zero-padding to the data
-#padded_data = np.pad(mean_hist, (kernel_size//2, kernel_size//2), mode='edge')
-#
-## Apply convolution to smooth the padded data
-#smoothed_padded_data = convolve(padded_data, kernel, mode='valid')
-#
-## The size of 'smoothed_padded_data' is smaller than the original 'data' due to valid convolution
-## If you want to keep the size the same, you can add zero-padding to the smoothed result
-#
-## Add zero-padding to the smoothed data to match the original size
-#padding = (kernel_size - 1) // 2
-#smoothed_data = np.pad(smoothed_padded_data, (padding, padding), mode='constant')
-#smoothed_data = smoothed_data[2:-2]
-#print(smoothed_data)
-#print(smoothed_data.shape)
-##print(upp_new.mean(axis=1).shape)
-### Plot the average firing rate over time
-#plt.figure('Figure 20')
-#plt.plot(np.linspace(0, simtime, len(smoothed_data)), smoothed_data, color='blue')
-#plt.plot(bin_centers[:len(smoothed_data)-1], mean_hist[:len(smoothed_data)-1])
-#plt.grid(True)
+plotting_flag = False
+bin_centers, hist_mean_exc_1, hist_mean_inh_1 = run_sim(1*123, plotting_flag)
+bin_centers, hist_mean_exc_2, hist_mean_inh_2 = run_sim(2*123, plotting_flag)
+bin_centers, hist_mean_exc_3, hist_mean_inh_3 = run_sim(3*123, plotting_flag)
+
+avg_hist_exc = np.column_stack((hist_mean_exc_1, hist_mean_exc_2, hist_mean_exc_3)).mean(axis=1)
+avg_hist_inh = np.column_stack((hist_mean_inh_1, hist_mean_inh_2, hist_mean_inh_3)).mean(axis=1)
+
+
+
+
+
+smoothed_data_exc = analyzer.smoothing_kernel(avg_hist_exc)
+smoothed_data_inh = analyzer.smoothing_kernel(avg_hist_inh)
+print(smoothed_data_exc.shape)
+print(smoothed_data_inh.shape)
+print('Finito')
+## Plot the average firing rate over time
+plt.figure()
+plt.plot(np.linspace(0, simtime, len(bin_centers[1:len(smoothed_data_exc)-3])), smoothed_data_exc[1:len(smoothed_data_exc)-3], color='blue')
+plt.plot(bin_centers[1:len(smoothed_data_exc)-3], avg_hist_exc[:len(avg_hist_exc)-1])
+plt.title('Average of Excitatory Neurons Across Trials')
+plt.grid(True)
+
+
+plt.figure()
+plt.plot(np.linspace(0, simtime, len(bin_centers[1:len(smoothed_data_inh)-3])), smoothed_data_inh[1:len(smoothed_data_inh)-3], color='blue')
+plt.plot(bin_centers[1:len(smoothed_data_inh)-3], avg_hist_exc[:len(avg_hist_inh)-1])
+plt.title('Average of Inhibitory Neurons Across Trials')
+plt.grid(True)
 
 plt.show()
 plt.close()
 
-'''
 
+'''
 # Plotting Second Edge Neurons Connected to the excitatory neuron which is target to the perturbed one 
 # target ids start from 1
 second_degree_target_exc = nest.GetTargetNodes(nodes_ex[targets_exc[0]-1], nodes_ex)[0]
@@ -456,7 +439,7 @@ plt.plot(time_axis, firing_rate_sec_inh_inh, color='blue')
 plt.grid(True)
 
 
-'''
+
 
 #Printing Network Parameters
 print("Brunel network simulation (Python)")
@@ -468,10 +451,9 @@ print(f"Excitatory rate   : {rate_ex:.2f} Hz")
 print(f"Inhibitory rate   : {rate_in:.2f} Hz")
 print(f"Building time     : {build_time:.2f} s")
 print(f"Simulation time   : {sim_time:.2f} s")
+'''
 
 
-
-plt.show()
 
 
 
