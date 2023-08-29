@@ -3,50 +3,33 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+from network_functions import NetworkAnalyzer
+from plotting_functions import PlottingFuncs
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib.colors import Normalize, LogNorm
 from matplotlib.cm import ScalarMappable
-import elephant.statistics as es
-from quantities import ms
-import neo
+from scipy.signal import convolve2d
+from scipy.signal import convolve
+import networkx as nx
 import nest
 import nest.raster_plot
 
 
-
-# Reset previous simulations
-nest.ResetKernel()
-# Set the number of threads you want to use
-num_threads = 4
-# Set the kernel status to change the number of threads
-nest.SetKernelStatus({"local_num_threads": num_threads})
-connection_seed = 42
-nest.SetKernelStatus({"rng_seed": connection_seed})
-dt = 0.1  # the resolution in ms
-nest.resolution = dt
-nest.print_time = True
-nest.overwrite_files = True
-
-
+simtime = 10000.0  # Simulation time in ms
+order = 1000
 
 # Define Simulation Parameters
-startbuild = time.time()
-simtime = 20000.0  # Simulation time in ms
+bin_width = 200.0
 delay = 1.5  # synaptic delay in ms
 g = 5.0  # ratio inhibitory weight/excitatory weight
 eta = 2.0  # external rate relative to threshold rate
 epsilon = 0.1  # connection probability
-order = 100
 NE = 4 * order  # number of excitatory neurons
 NI = 1 * order  # number of inhibitory neurons
 N_neurons = NE + NI  # number of neurons in total
 CE = int(epsilon * NE)  # number of excitatory synapses per neuron
 CI = int(epsilon * NI)  # number of inhibitory synapses per neuron
 C_tot = int(CI + CE)  # total number of synapses per neuron
-
-
-
-
 # Define Neuron Parameters
 tauMem = 20.0  # time constant of membrane potential in ms
 theta = 20.0  # membrane threshold potential in mV
@@ -60,7 +43,6 @@ neuron_params = {"C_m": 1.0,
 J = 0.5  # postsynaptic amplitude in mV
 J_ex = J  # amplitude of excitatory postsynaptic potential
 J_in = -g * J_ex  # amplitude of inhibitory postsynaptic potential
-
 nu_th = theta / (J * CE * tauMem)
 nu_ex = eta * nu_th
 p_rate = 1000.0 * nu_ex * CE
@@ -68,440 +50,229 @@ p_rate = 1000.0 * nu_ex * CE
 
 
 
-
-print("Building network")
-#Define Connection Parameters
-conn_params_ex = {"rule": "fixed_indegree", "indegree": CE}
-conn_params_in = {"rule": "fixed_indegree", "indegree": CI}
-#Define the Positions
-pos_ex = nest.spatial.free(pos=nest.random.uniform(min=-2.0, max=2.0), num_dimensions=2)
-# Create excitatory neurons, inhibitory neurons, poisson spike generator, and spike recorders
-nodes_ex = nest.Create("iaf_psc_delta", NE, params=neuron_params, positions=pos_ex)
-nodes_in = nest.Create("iaf_psc_delta", NI, params=neuron_params, positions=pos_ex)
-noise = nest.Create("poisson_generator", params={"rate": p_rate})
-espikes = nest.Create("spike_recorder")
-ispikes = nest.Create("spike_recorder")
-
-#Define the Synapses
-nest.CopyModel("static_synapse", "excitatory", {"weight": J_ex, "delay": delay})
-nest.CopyModel("static_synapse", "inhibitory", {"weight": J_in, "delay": delay})
-
-# Create Connections between populations
-nest.Connect(nodes_ex, nodes_ex, conn_params_ex, "excitatory")
-nest.Connect(nodes_ex, nodes_in, conn_params_ex, "excitatory")
-
-nest.Connect(nodes_in, nodes_ex, conn_params_in, "inhibitory")
-nest.Connect(nodes_in, nodes_in, conn_params_in, "inhibitory")
-
-# Connect Noise Generators 
-nest.Connect(noise, nodes_ex, syn_spec="excitatory")
-nest.Connect(noise, nodes_in, syn_spec="excitatory")
-
-# Connect recorders
-nest.Connect(nodes_ex, espikes, syn_spec="excitatory")
-nest.Connect(nodes_in, ispikes, syn_spec="excitatory")
-
-
-
-
-
-
-# Plot Target Neurons of the Center Neuron
-fig1 = nest.PlotLayer(nodes_ex, nodesize=50)
-
-ctr = nest.FindCenterElement(nodes_ex)
-nest.PlotTargets(
-    ctr,
-    nodes_ex,
-    fig=fig1,
-    src_size=250,
-    tgt_color="red",
-    tgt_size=20,
-    mask_color="red",
-    probability_cmap="Greens",
-)
-
-plt.xticks(np.arange(-1.5, 1.55, 0.5))
-plt.yticks(np.arange(-1.5, 1.55, 0.5))
-plt.grid(True)
-plt.axis([-2.0, 2.0, -2.0, 2.0])
-plt.title("Connection targets")
-
-# Plot Source Neurons of the Center Neuron
-fig2 = nest.PlotLayer(nodes_ex)
-nest.PlotSources(
-    nodes_ex,
-    ctr,
-    fig=fig2,
-    src_size=50,
-    src_color='green',
-    tgt_size=20,
-    mask_color="red",
-    probability_cmap="Greens",
-)
-
-plt.xticks(np.arange(-1.5, 1.55, 0.5))
-plt.yticks(np.arange(-1.5, 1.55, 0.5))
-plt.grid(True)
-plt.axis([-2.0, 2.0, -2.0, 2.0])
-plt.title("Connection targets")
-
-
-
-
-
-# target ids start from 1
-# Inhibitory and Excitatory Target Neurons
-target_ids_exc = nest.GetTargetNodes(ctr, nodes_ex)[0]
-target_ids_inh = nest.GetTargetNodes(ctr, nodes_in)[0]
-targets_exc = target_ids_exc.tolist()
-targets_inh = target_ids_inh.tolist()
-print(targets_exc)
-print(targets_inh)
-
-# ID of the center neuron
-nest.GetLocalNodeCollection(ctr)
-src_id = int(ctr.tolist()[0])
-print("src_id:", src_id)
-
-
-
-
-# Create Simulator and Connect it
-amplitude=160.0
-stim_params = {"amplitude": amplitude, "start": 5150.0, "stop": 18150.0}
-stimulator = nest.Create("dc_generator", params=stim_params)
-
-#Choose Some Neurons
-exc_id1 = int(targets_exc[0])
-inh_id1 = int(targets_inh[0])
-inh_id2 = int(targets_inh[1])
-
-print("inh_id1=", inh_id1)
-print("inh_id2=", inh_id2)
-
-# Connect the stimulator to the neuron
-nest.Connect(stimulator, nodes_ex[src_id-1])
-#nest.Connect(stimulator, nodes_ex[exc_id1-1])
-#nest.Connect(stimulator, nodes_in[inh_id1-NE-1])
-#nest.Connect(stimulator, nodes_in[inh_id2-NE-1])
-endbuild = time.time()
-
-connectivity=np.zeros((N_neurons,N_neurons))
-
-conn_ex=nest.GetConnections(nodes_ex)
-conn_ex_source= nest.GetStatus(conn_ex, keys='source')
-conn_ex_target= nest.GetStatus(conn_ex, keys='target')
-conn_ex_weight= nest.GetStatus(conn_ex, keys='weight')
-
-conn_in=nest.GetConnections(nodes_in)
-conn_in_source= nest.GetStatus(conn_in, keys='source')
-conn_in_target= nest.GetStatus(conn_in, keys='target')
-conn_in_weight= nest.GetStatus(conn_in, keys='weight')
-
-for i in range(len(conn_ex_source)):
-	if conn_ex_source[i]<= N_neurons and conn_ex_target[i]<= N_neurons:
-		connectivity[conn_ex_source[i]-1,conn_ex_target[i]-1]=conn_ex_weight[i]
-for i in range(len(conn_in_source)):
-	if conn_in_source[i]<=N_neurons and conn_in_target[i]<= N_neurons:
-		connectivity[conn_in_source[i]-1,conn_in_target[i]-1]=conn_in_weight[i]
-		
-connectivity_matrix=connectivity.T
-np.savetxt("connectivity.dat",connectivity_matrix,delimiter="\t",fmt="%1.4f")
-# Normalize the values for colormap mapping
-norm = Normalize(vmin=np.min(connectivity_matrix), vmax=np.max(connectivity_matrix))
-colormap = plt.get_cmap('viridis')  # Choose a colormap (e.g., 'viridis')
-
-# Create the connection plot
-plt.figure(figsize=(10, 10))
-for row in range(connectivity_matrix.shape[0]):
-    for col in range(connectivity_matrix.shape[1]):
-        if connectivity_matrix[row, col] != 0:  # Plot only connections with non-zero values
-            color = colormap(norm(connectivity_matrix[row, col]))
-            plt.plot([col], [500 - row], marker='o', markersize=5, color=color)
-
-# Customize the plot
-sm = ScalarMappable(cmap=colormap, norm=norm)
-sm.set_array([])  # Prevents error in colorbar
-plt.colorbar(sm, label='Amplitude')  # Add colorbar with amplitude label
-plt.xlim(0, 500)
-plt.ylim(0, 500)
-plt.gca().invert_yaxis()
-plt.title("Connection Plot with Colormap")
-plt.xlabel("Column Index")
-plt.ylabel("Row Index")
-plt.show()
-
-# Start Simulation
-print("Simulating")
-
-nest.Simulate(simtime)
-
-endsimulate = time.time()
-
-
-# Extract Some Parameters from the Simulation
-events_ex = espikes.n_events
-events_in = ispikes.n_events
-
-rate_ex = events_ex / simtime * 1000.0 / NE
-rate_in = events_in / simtime * 1000.0 / NI
-
-num_synapses_ex = nest.GetDefaults("excitatory")["num_connections"]
-num_synapses_in = nest.GetDefaults("inhibitory")["num_connections"]
-num_synapses = num_synapses_ex + num_synapses_in
-
-build_time = endbuild - startbuild
-sim_time = endsimulate - endbuild
-
-
-
-
-# Extract spikes and plot raster plot
-sr1_spikes = espikes.events['senders']
-sr1_times = espikes.events['times']
-sr2_spikes = ispikes.events['senders']
-sr2_times = ispikes.events['times']
-
-plt.figure('Figure 3')
-
-plt.plot(sr1_times, sr1_spikes,
-        '.', markersize=1, color='blue', label='Exc')
-plt.plot(sr2_times, sr2_spikes,
-        '.', markersize=1, color='orange', label='Inh')
-plt.xlabel('time (ms)')
-plt.ylabel('neuron id')
-plt.legend()
-
-
-
-
-# Calculation of the average firing rate
-def calculate_avg_firing(pop, sim_time, spikes, times, flag):
-    #min_value = np.min(spikes)
-    #max_value = np.max(spikes)
-    if flag==0:
-        neuron_ids = [i for i in range(1, NE + 1, 1)]
-    else:
-        neuron_ids = [i for i in range(1 + NE, NI + 1 + NE, 1)]
-    firing_rates = []
-    spike_times = []
-    for neuron_id in neuron_ids:
-        spikes_for_neuron = np.sum(spikes == neuron_id)
-        firing_rate = spikes_for_neuron / (sim_time / 1000)  # Convert to Hz
-        firing_rates.append(firing_rate)
-
-        time_indices = np.where(spikes==neuron_id)[0]
-        time_values = times[time_indices]
-        spike_times.append(time_values)
-
-        
-    # Calculate average firing rate
-    average_firing_rate = np.mean(firing_rates)
+def run_sim(random_seed, plotting_flag):
+    # Reset previous simulations
+    nest.ResetKernel()
+    # Set the number of threads you want to use
+    num_threads = 4
+    # Set the kernel status to change the number of threads
+    nest.SetKernelStatus({"local_num_threads": num_threads})
+    dt = 0.1  # the resolution in ms
+    nest.resolution = dt
+    nest.print_time = True
+    nest.overwrite_files = True
     
-    return average_firing_rate, spike_times
 
+    print("Building network")
+    #Define Connection Parameters
+    conn_params_ex = {"rule": "fixed_indegree", "indegree": CE}
+    conn_params_in = {"rule": "fixed_indegree", "indegree": CI}
+    #Define the Positions
+    pos_ex = nest.spatial.free(pos=nest.random.uniform(min=-2.0, max=2.0), num_dimensions=2)
+    # Create excitatory neurons, inhibitory neurons, poisson spike generator, and spike recorders
+    nodes_ex = nest.Create("iaf_psc_delta", NE, params=neuron_params, positions=pos_ex)
+    nodes_in = nest.Create("iaf_psc_delta", NI, params=neuron_params, positions=pos_ex)
+    nest.SetKernelStatus({"rng_seed": random_seed})
+    noise = nest.Create("poisson_generator", params={"rate": p_rate})
+    espikes = nest.Create("spike_recorder")
+    ispikes = nest.Create("spike_recorder")
 
-# Calculate avg. firing rates of excitatory neurons
-avg_firing_exc, spike_times_exc = calculate_avg_firing(nodes_ex, simtime, sr1_spikes, sr1_times, 0)
-print(avg_firing_exc)
-# Calculate avg. firing rates of inhibitory neurons
-avg_firing_inh, spike_times_inh = calculate_avg_firing(nodes_in, simtime, sr2_spikes, sr2_times, 1)
-print(avg_firing_inh)
+    #Define the Synapses
+    nest.CopyModel("static_synapse", "excitatory", {"weight": J_ex, "delay": delay})
+    nest.CopyModel("static_synapse", "inhibitory", {"weight": J_in, "delay": delay})
 
+    # Create Connections between populations
+    nest.Connect(nodes_ex, nodes_ex, conn_params_ex, syn_spec="excitatory")
+    nest.Connect(nodes_ex, nodes_in, conn_params_ex, syn_spec="excitatory")
 
+    nest.Connect(nodes_in, nodes_ex, conn_params_in, "inhibitory")
+    nest.Connect(nodes_in, nodes_in, conn_params_in, "inhibitory")
 
+    # Connect Noise Generators 
+    nest.Connect(noise, nodes_ex, syn_spec="excitatory")
+    nest.Connect(noise, nodes_in, syn_spec="excitatory")
 
+    # Connect recorders
+    nest.Connect(nodes_ex, espikes, syn_spec="excitatory")
+    nest.Connect(nodes_in, ispikes, syn_spec="excitatory")
 
-# Calculate Coefficient of Variation values of Neurons and plot histogram of them
-def calculate_CoV(spike_times):
-    consecutive_diffs = [np.diff(sublist) for sublist in spike_times]
-    mean_isi = [np.mean(sublist) for sublist in consecutive_diffs]
-    std_isi = [np.std(sublist) for sublist in consecutive_diffs]
 
-    CoV = [a/b for a, b in zip(std_isi, mean_isi)]
 
-    return CoV
 
-# Calculate CoV of excitatory neurons
-CoV_exc = calculate_CoV(spike_times_exc)
-# Calculate CoV of inhibitory neurons
-CoV_inh = calculate_CoV(spike_times_inh)
+    # Plot Target Neurons of the Center Neuron
+    ctr = nest.FindCenterElement(nodes_ex)
+        
+    
 
-# Create a histogram plot for excitatory neurons
-plt.figure('Figure 4')
-plt.hist(CoV_exc, bins=30, edgecolor='black')  # Adjust the number of bins as needed
-plt.xlabel("Value")
-plt.ylabel("Frequency")
-plt.title("CV of Excitatory Neurons")
+    # target ids start from 1
+    # Inhibitory and Excitatory Target Neurons
 
-# Create a histogram plot for inhibitory neurons
-plt.figure('Figure 5')
-plt.hist(CoV_inh, bins=30, edgecolor='black')  # Adjust the number of bins as needed
-plt.xlabel("Value")
-plt.ylabel("Frequency")
-plt.title("CV of Inhibitory Neurons")
+    # ID of the center neuron
+    src_id = int(ctr.tolist()[0])
+    print("src_id:", ctr.tolist())
 
 
 
+    # Create Simulator and Connect it
+    amplitude=160.0
+    stim_params = {"amplitude": amplitude, "start": 5150.0, "stop": 18150.0}
+    stimulator = nest.Create("dc_generator", params=stim_params)
 
 
+    # Connect the stimulator to the neuron
+    nest.Connect(stimulator, nodes_ex[src_id-1])
 
-spike_times_exc = np.array(spike_times_exc)
-print(spike_times_exc.shape)
-bin_width = 200.0
-#Plot the histogram of the Perturbed Neuron
-plt.figure('Figure 6')
-# Create a histogram plot for excitatory neurons
-plt.hist(spike_times_exc[src_id-1], bins=int(simtime/bin_width), edgecolor='black')  # Adjust the number of bins as needed
-plt.xlabel("Value")
-plt.ylabel("Frequency")
-plt.title("Histogram of the Stimulated Neuron")
+    target_ids_exc = nest.GetTargetNodes(ctr, nodes_ex)[0]
+    target_ids_inh = nest.GetTargetNodes(ctr, nodes_in)[0]
+    targets_exc = target_ids_exc.tolist()
+    targets_inh = target_ids_inh.tolist()
+    #print(targets_exc)
+    #print(targets_inh)
 
 
+    
+    
+    
+    #connectivity_matrix = analyzer.create_connectivity(nodes_ex, nodes_in)
+    #np.savetxt("connectivity.dat",connectivity_matrix,delimiter="\t",fmt="%1.4f")
 
+    
+    
 
 
+    # Start Simulation
+    print("Simulating")
 
-# Plot the mean firing rate of the Excitatory Neurons Connected to the Perturbed One
-hist_counts_all_exc = []
-elep_spike_times_exc=[]
-#targets_exc.remove(src_id)
-for i in targets_exc:
-    if i==src_id:
-        data = spike_times_exc[i-1]
-        num_bins = int(simtime/bin_width)
-        hist_counts_kk, hist_edges = np.histogram(data, bins=num_bins, range=(min(data), max(data)))
-    else:
-        data = spike_times_exc[i-1]
-        elep_spike_times_exc.append(data)
-        num_bins = int(simtime/bin_width)
-        hist_counts, hist_edges = np.histogram(data, bins=num_bins, range=(min(data), max(data)))
-        hist_counts_all_exc.append(hist_counts/0.2)
+    nest.Simulate(simtime)
 
-bin_centers = (hist_edges[:-1] + hist_edges[1:]) / 2
-hist_counts_all_exc = np.array(hist_counts_all_exc)
-print(hist_counts_all_exc.shape)
+    # Extract Some Parameters from the Simulation
+    events_ex = espikes.n_events
+    events_in = ispikes.n_events
 
-plt.figure('Figure 7')
-plt.plot(bin_centers, hist_counts_all_exc.T.mean(axis=1))
-#plt.legend(targets_exc)
-plt.title("Stim: Excitatory Neurons (CE= {}, CI= {})".format(CE, CI))
-plt.xlabel('Time')
-plt.ylabel('Firing Rate (Hz)')
+    rate_ex = events_ex / simtime * 1000.0 / NE
+    rate_in = events_in / simtime * 1000.0 / NI
 
+    num_synapses_ex = nest.GetDefaults("excitatory")["num_connections"]
+    num_synapses_in = nest.GetDefaults("inhibitory")["num_connections"]
+    num_synapses = num_synapses_ex + num_synapses_in
 
 
 
 
-
-
-# Plot the mean firing rate of the Excitatory Neurons Connected to the Perturbed One Using Smoothing Kernel
-elep_spike_times_exc = np.array(elep_spike_times_exc)*ms
-spiketrains = [neo.SpikeTrain(times, t_start=0 * ms, t_stop=simtime * ms) for times in elep_spike_times_exc]
-
-# Specify the parameters for the instantaneous_rate function
-sampling_period = 1 * ms
-kernel = 'auto'  # You can specify a specific kernel shape if needed
-cutoff = 5.0 
-
-# Call the instantaneous_rate function for each neuron's spike train
-firing_rates_exc = []
-for spiketrain in spiketrains:
-    rate_analog_signal = es.instantaneous_rate(spiketrain, sampling_period, kernel=kernel, cutoff=cutoff)
-    firing_rates_exc.append(rate_analog_signal.magnitude)
-
-# Calculate the average firing rate across neurons for each time step
-average_firing_rate = np.mean(firing_rates_exc, axis=0)
-print(average_firing_rate.shape)
-
-# Create a time axis based on the first spiketrain's duration
-time_axis = np.linspace(0, simtime, len(average_firing_rate))
-
-# Plot the average firing rate over time
-plt.plot(time_axis, average_firing_rate, color='blue')
-plt.grid(True)
-plt.figure('Figure 8')
-plt.plot(bin_centers, hist_counts_all_exc[2].T)
-#plt.legend(targets_exc)
-plt.title("Stim: Excitatory Neurons (CE= {}, CI= {})".format(CE, CI))
-plt.xlabel('Time')
-plt.ylabel('Firing Rate (Hz)')
-# Plot the average firing rate over time
-plt.plot(time_axis, firing_rates_exc[2], color='blue')
-plt.grid(True)
-
-
-
-
-
-
-
-# Plot the mean firing rate of the Inhibitory Neurons Connected to the Perturbed One
-hist_counts_all_inh = []
-elep_spike_times_inh = []
-for i in targets_inh:
-    data = spike_times_inh[i-NE-1]
-    elep_spike_times_inh.append(data)
-    num_bins = int(simtime/bin_width)
-    hist_counts, hist_edges = np.histogram(data, bins=num_bins, range=(min(data), max(data)))
-    hist_counts_all_inh.append(hist_counts/0.2)
-bin_centers = (hist_edges[:-1] + hist_edges[1:]) / 2
-hist_counts_all_inh = np.array(hist_counts_all_inh)
-
-plt.figure('Figure 9')
-plt.plot(bin_centers, hist_counts_all_inh.T.mean(axis=1))
-#plt.legend(targets_inh)
-plt.title("Stim: Inhibitory Neurons (CE= {}, CI= {})".format(CE, CI))
-plt.xlabel('Time')
-plt.ylabel('Firing Rate (Hz)')
-
-
-
-
-
-# Plot the mean firing rate of the Inhibitory Neurons Connected to the Perturbed One using smoothing Kernel
-elep_spike_times_inh = np.array(elep_spike_times_inh)*ms
-
-spiketrains = [neo.SpikeTrain(times, t_start=0 * ms, t_stop=simtime * ms) for times in elep_spike_times_inh]
-
-# Specify the parameters for the instantaneous_rate function
-sampling_period = 1 * ms
-kernel = 'auto'  # You can specify a specific kernel shape if needed
-cutoff = 5.0 
-
-# Call the instantaneous_rate function for each neuron's spike train
-firing_rates_inh = []
-for spiketrain in spiketrains:
-    rate_analog_signal = es.instantaneous_rate(spiketrain, sampling_period, kernel=kernel, cutoff=cutoff)
-    firing_rates_inh.append(rate_analog_signal.magnitude)
-
-# Calculate the average firing rate across neurons for each time step
-average_firing_rate = np.mean(firing_rates_inh, axis=0)
-print(average_firing_rate.shape)
-# Create a time axis based on the first spiketrain's duration
-time_axis = np.linspace(0, simtime, len(average_firing_rate))
-
-# Plot the average firing rate over time
-plt.plot(time_axis, average_firing_rate, color='blue')
-plt.grid(True)
-
-plt.figure('Figure 10')
-plt.plot(bin_centers, hist_counts_all_inh[2].T)
-#plt.legend(targets_exc)
-plt.title("Stim: Inhibitory Neurons (CE= {}, CI= {})".format(CE, CI))
-plt.xlabel('Time')
-plt.ylabel('Firing Rate (Hz)')
-
-# Plot the average firing rate over time
-plt.plot(time_axis, firing_rates_inh[2], color='blue')
-plt.grid(True)
-
-
-
-
-
-
+    # Extract spikes and plot raster plot
+    sr1_spikes = espikes.events['senders']
+    sr1_times = espikes.events['times']
+    sr2_spikes = ispikes.events['senders']
+    sr2_times = ispikes.events['times']
+
+    
+    
+
+
+    # Calculate avg. firing rates of excitatory neurons
+    avg_firing_exc, spike_times_exc = analyzer.calculate_avg_firing(nodes_ex, simtime, sr1_spikes, sr1_times, 0)
+    print(avg_firing_exc)
+    # Calculate avg. firing rates of inhibitory neurons
+    avg_firing_inh, spike_times_inh = analyzer.calculate_avg_firing(nodes_in, simtime, sr2_spikes, sr2_times, 1)
+    print(avg_firing_inh)
+
+
+
+    # Calculate CoV of excitatory neurons
+    CoV_exc = analyzer.calculate_CoV(spike_times_exc)
+    # Calculate CoV of inhibitory neurons
+    CoV_inh = analyzer.calculate_CoV(spike_times_inh)
+
+
+    # Calculating firing rates for both populations
+    hist_counts_all_exc, bin_centers_exc, avg_hist_counts_exc, average_firing_rate_exc_elep, firing_rates_smoothed_exc_elep = analyzer.calculating_firing_rates(targets_exc, src_id, spike_times_exc, 0)
+
+    hist_counts_all_inh, bin_centers_inh, avg_hist_counts_inh, average_firing_rate_inh_elep, firing_rates_smoothed_inh_elep = analyzer.calculating_firing_rates(targets_inh, src_id, spike_times_inh, 1)
+
+
+
+    if (plotting_flag==True):
+        # Plot of connection of source and target neuron (in our case central neuron ctr)
+        m_plot.plot_spatial_connections(nodes_ex, ctr)
+        # Plot source connectivity matrix
+        #m_plot.plot_connectivity(connectivity_matrix)
+        # Plot raster plot
+        m_plot.plot_raster_plot(sr1_spikes, sr1_times, sr2_spikes, sr2_times)
+        # Plot CV of excitatory neurons
+        m_plot.plot_CV_plot(CoV_exc, 0)
+        # Plot CV of inhibitory neurons
+        m_plot.plot_CV_plot(CoV_inh, 1)
+        # Plot histogram plot of perturbed neuron
+        m_plot.plot_hist_perturbed(spike_times_exc, src_id)
+        # Plot average firing rate of excitatory neurons connected to the perturbed neuron
+        m_plot.plot_avg_firing_rate(bin_centers_exc, avg_hist_counts_exc, average_firing_rate_exc_elep, 0)
+        # Plot average firing rate of inhibitory neurons connected to the perturbed neuron
+        m_plot.plot_avg_firing_rate(bin_centers_inh, avg_hist_counts_inh, average_firing_rate_inh_elep, 1)
+        # Plot one example of excitatory neuron connected to the perturbed neuron
+        m_plot.plot_example_neuron(bin_centers_exc, hist_counts_all_exc[2].T, firing_rates_smoothed_exc_elep[2], 0)
+        # Plot one example of inhibitory neuron connected to the perturbed neuron
+        m_plot.plot_example_neuron(bin_centers_inh, hist_counts_all_inh[0].T, firing_rates_smoothed_inh_elep[0], 1)
+
+
+
+
+    return np.array(average_firing_rate_exc_elep), bin_centers_exc, avg_hist_counts_exc
+
+
+
+analyzer = NetworkAnalyzer(NE, NI, N_neurons, simtime, bin_width)
+m_plot = PlottingFuncs(N_neurons, simtime, bin_width, CE, CI)
+
+plotting_flag = True
+ff_1, bin_centers, hist_mean_1 = run_sim(1*123, plotting_flag)
+#ff_2, bin_centers, hist_mean_2 = run_sim(2*123)
+#ff_3, bin_centers, hist_mean_3 = run_sim(3*123)
+#ff_4, bin_centers, hist_mean_4 = run_sim(4*123)
+#ff_5, bin_centers, hist_mean_5 = run_sim(5*123)
+#ff_6, bin_centers, hist_mean_6 = run_sim(6*123)
+#ff_7, bin_centers, hist_mean_7 = run_sim(7*123)
+#ff_8, bin_centers, hist_mean_8 = run_sim(8*123)
+#ff_9, bin_centers, hist_mean_9 = run_sim(9*123)
+#upp_new = np.hstack((ff_1, ff_2, ff_3))
+#hist_new = np.column_stack((hist_mean_1, hist_mean_2, hist_mean_3))
+#upp_new = np.hstack((ff_1, ff_2, ff_3, ff_4, ff_5, ff_6, ff_7, ff_8, ff_9))
+#hist_new = np.column_stack((hist_mean_1, hist_mean_2, hist_mean_3, hist_mean_4, hist_mean_5, hist_mean_6, hist_mean_7, hist_mean_8, hist_mean_9))
+#mean_hist = hist_new.mean(axis=1)
+#print(type(hist_new.mean(axis=1)))
+#print(hist_new.mean(axis=1).shape)
+#print(ff_2.shape)
+#print(ff_3.shape)
+#
+## Define the smoothing kernel (e.g., Gaussian kernel)
+#kernel_size = 5  # Adjust the size of the kernel as needed
+#sigma = 1.0      # Adjust the sigma parameter for Gaussian distribution
+#kernel = np.exp(-(np.arange(-kernel_size//2, kernel_size//2 + 1)**2) / (2*sigma**2))
+#kernel /= np.sum(kernel)  # Normalize the kernel so that the sum is 1
+#
+## Apply zero-padding to the data
+#padded_data = np.pad(mean_hist, (kernel_size//2, kernel_size//2), mode='edge')
+#
+## Apply convolution to smooth the padded data
+#smoothed_padded_data = convolve(padded_data, kernel, mode='valid')
+#
+## The size of 'smoothed_padded_data' is smaller than the original 'data' due to valid convolution
+## If you want to keep the size the same, you can add zero-padding to the smoothed result
+#
+## Add zero-padding to the smoothed data to match the original size
+#padding = (kernel_size - 1) // 2
+#smoothed_data = np.pad(smoothed_padded_data, (padding, padding), mode='constant')
+#smoothed_data = smoothed_data[2:-2]
+#print(smoothed_data)
+#print(smoothed_data.shape)
+##print(upp_new.mean(axis=1).shape)
+### Plot the average firing rate over time
+#plt.figure('Figure 20')
+#plt.plot(np.linspace(0, simtime, len(smoothed_data)), smoothed_data, color='blue')
+#plt.plot(bin_centers[:len(smoothed_data)-1], mean_hist[:len(smoothed_data)-1])
+#plt.grid(True)
+
+plt.show()
+plt.close()
 
 '''
 
