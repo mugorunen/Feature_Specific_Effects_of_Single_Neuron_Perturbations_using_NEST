@@ -76,7 +76,7 @@ class PlottingFuncs:
         plt.ylabel("Row Index")
 
     def plot_raster_plot(self, sr1_spikes, sr1_times, sr2_spikes, sr2_times):
-        plt.figure()
+        plt.figure('Figure 3')
 
         plt.plot(sr1_times, sr1_spikes,
                 '.', markersize=1, color='blue', label='Exc')
@@ -100,7 +100,7 @@ class PlottingFuncs:
     def plot_hist_perturbed(self, spike_times_exc, src_id):
         spike_times_exc = np.array(spike_times_exc)
         #Plot the histogram of the Perturbed Neuron
-        plt.figure()
+        plt.figure('Figure 5')
         # Create a histogram plot for excitatory neurons
         plt.hist(spike_times_exc[src_id-1], bins=int(self.simtime/self.bin_width), edgecolor='black')  # Adjust the number of bins as needed
         plt.xlabel("Value")
@@ -145,6 +145,15 @@ class PlottingFuncs:
         plt.plot(time_axis, firing_rates_smoothed_one_neuron, color='blue')
         plt.grid(True)
 
+    def plotting_across_trials(self, bin_centers, smoothed_data, avg_hist, neuron_type):
+        plt.figure()
+        plt.plot(np.linspace(0, self.simtime, len(bin_centers)), smoothed_data, color='blue')
+        plt.plot(bin_centers, avg_hist)
+        if neuron_type==0:
+            plt.title('Average of Excitatory Neurons Across Trials')
+        else:
+            plt.title('Average of Inhibitory Neurons Across Trials')
+        plt.grid(True)
 
 
         

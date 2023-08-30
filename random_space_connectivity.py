@@ -15,8 +15,8 @@ import nest
 import nest.raster_plot
 
 
-simtime = 10000.0  # Simulation time in ms
-order = 500
+simtime = 20000.0  # Simulation time in ms
+order = 2000
 
 # Define Simulation Parameters
 bin_width = 200.0
@@ -54,7 +54,7 @@ def run_sim(random_seed, plotting_flag):
     # Reset previous simulations
     nest.ResetKernel()
     # Set the number of threads you want to use
-    num_threads = 4
+    num_threads = 6
     # Set the kernel status to change the number of threads
     nest.SetKernelStatus({"local_num_threads": num_threads})
     dt = 0.1  # the resolution in ms
@@ -99,18 +99,7 @@ def run_sim(random_seed, plotting_flag):
 
 
 
-    # Plot Target Neurons of the Center Neuron
-    ctr = nest.FindCenterElement(nodes_ex)
-        
-    
-
-    # target ids start from 1
-    # Inhibitory and Excitatory Target Neurons
-
-    # ID of the center neuron
-    src_id = int(ctr.tolist()[0])
-    print("src_id:", ctr.tolist())
-
+    ctr, src_id, targets_exc, targets_inh = analyzer.find_src_target_ids(nodes_ex, nodes_in)
 
 
     # Create Simulator and Connect it
@@ -121,20 +110,11 @@ def run_sim(random_seed, plotting_flag):
 
     # Connect the stimulator to the neuron
     nest.Connect(stimulator, nodes_ex[src_id-1])
-
-    target_ids_exc = nest.GetTargetNodes(ctr, nodes_ex)[0]
-    target_ids_inh = nest.GetTargetNodes(ctr, nodes_in)[0]
-    targets_exc = target_ids_exc.tolist()
-    targets_inh = target_ids_inh.tolist()
-    #print(targets_exc)
-    #print(targets_inh)
-
-
     
     
     
-    #connectivity_matrix = analyzer.create_connectivity(nodes_ex, nodes_in)
-    #np.savetxt("connectivity.dat",connectivity_matrix,delimiter="\t",fmt="%1.4f")
+    connectivity_matrix = analyzer.create_connectivity(nodes_ex, nodes_in)
+    np.savetxt("connectivity.dat",connectivity_matrix,delimiter="\t",fmt="%1.4f")
 
     
     
@@ -190,12 +170,36 @@ def run_sim(random_seed, plotting_flag):
     hist_counts_all_inh, bin_centers_inh, avg_hist_counts_inh, average_firing_rate_inh_elep, firing_rates_smoothed_inh_elep = analyzer.calculating_firing_rates(targets_inh, src_id, spike_times_inh, 1)
 
 
+    ctr, src_id, targets_exc, targets_inh = analyzer.find_src_target_ids(nodes_ex, nodes_in)
 
-    if (plotting_flag==True):
+    nodes_exc_exc_2_away_all, nodes_inh_exc_2_away_all= analyzer.get_nodes_2_nodes_away(ctr, src_id, targets_exc, nodes_ex, nodes_in, 0)
+
+    nodes_exc_exc_2_away = [x for x in nodes_exc_exc_2_away_all if x not in targets_exc]
+    nodes_inh_exc_2_away = [x for x in nodes_inh_exc_2_away_all if x not in targets_inh]
+
+    # Calculating firing rates for both populations
+    hist_counts_all_exc, bin_centers_exc, avg_hist_counts_exc_exc, average_firing_rate_exc_exc_elep, firing_rates_smoothed_exc_exc_elep = analyzer.calculating_firing_rates(nodes_exc_exc_2_away, src_id, spike_times_exc, 0)
+    hist_counts_all_inh, bin_centers_inh, avg_hist_counts_inh_exc, average_firing_rate_inh_exc_elep, firing_rates_smoothed_inh_exc_elep = analyzer.calculating_firing_rates(nodes_inh_exc_2_away, src_id, spike_times_inh, 1)
+
+
+
+    nodes_exc_inh_2_away_all, nodes_inh_inh_2_away_all= analyzer.get_nodes_2_nodes_away(ctr, src_id, targets_inh, nodes_ex, nodes_in, 1)
+
+    nodes_exc_inh_2_away = [x for x in nodes_exc_inh_2_away_all if x not in targets_exc]
+    nodes_inh_inh_2_away = [x for x in nodes_inh_inh_2_away_all if x not in targets_inh]
+
+    # Calculating firing rates for both populations
+    hist_counts_all_exc, bin_centers_exc, avg_hist_counts_exc_inh, average_firing_rate_exc_inh_elep, firing_rates_smoothed_exc_inh_elep = analyzer.calculating_firing_rates(nodes_exc_inh_2_away, src_id, spike_times_exc, 0)
+    hist_counts_all_inh, bin_centers_inh, avg_hist_counts_inh_inh, average_firing_rate_inh_inh_elep, firing_rates_smoothed_inh_inh_elep = analyzer.calculating_firing_rates(nodes_inh_inh_2_away, src_id, spike_times_inh, 1)
+
+
+
+    if (plotting_flag):
         # Plot of connection of source and target neuron (in our case central neuron ctr)
+
         m_plot.plot_spatial_connections(nodes_ex, ctr)
         # Plot source connectivity matrix
-        #m_plot.plot_connectivity(connectivity_matrix)
+        m_plot.plot_connectivity(connectivity_matrix)
         # Plot raster plot
         m_plot.plot_raster_plot(sr1_spikes, sr1_times, sr2_spikes, sr2_times)
         # Plot CV of excitatory neurons
@@ -209,14 +213,16 @@ def run_sim(random_seed, plotting_flag):
         # Plot average firing rate of inhibitory neurons connected to the perturbed neuron
         m_plot.plot_avg_firing_rate(bin_centers_inh, avg_hist_counts_inh, average_firing_rate_inh_elep, 1)
         # Plot one example of excitatory neuron connected to the perturbed neuron
-        m_plot.plot_example_neuron(bin_centers_exc, hist_counts_all_exc[2].T, firing_rates_smoothed_exc_elep[2], 0)
+        #m_plot.plot_example_neuron(bin_centers_exc, hist_counts_all_exc[2].T, firing_rates_smoothed_exc_elep[2], 0)
         # Plot one example of inhibitory neuron connected to the perturbed neuron
-        m_plot.plot_example_neuron(bin_centers_inh, hist_counts_all_inh[0].T, firing_rates_smoothed_inh_elep[0], 1)
+        #m_plot.plot_example_neuron(bin_centers_inh, hist_counts_all_inh[0].T, firing_rates_smoothed_inh_elep[0], 1)
 
 
 
 
-    return bin_centers_exc, avg_hist_counts_exc, avg_hist_counts_inh
+    return nodes_ex, nodes_in, bin_centers_exc, avg_hist_counts_exc, avg_hist_counts_inh, spike_times_exc, spike_times_inh, avg_hist_counts_exc_exc, avg_hist_counts_inh_exc, avg_hist_counts_exc_inh, avg_hist_counts_inh_inh
+
+
 
 
 
@@ -224,234 +230,68 @@ analyzer = NetworkAnalyzer(NE, NI, N_neurons, simtime, bin_width)
 m_plot = PlottingFuncs(N_neurons, simtime, bin_width, CE, CI)
 
 plotting_flag = False
-bin_centers, hist_mean_exc_1, hist_mean_inh_1 = run_sim(1*123, plotting_flag)
-bin_centers, hist_mean_exc_2, hist_mean_inh_2 = run_sim(2*123, plotting_flag)
-bin_centers, hist_mean_exc_3, hist_mean_inh_3 = run_sim(3*123, plotting_flag)
+nodes_ex1, nodes_in1, bin_centers, hist_mean_exc_1, hist_mean_inh_1, spike_times_exc_1, spike_times_exc_1, avg_hist_counts_exc_exc_1, avg_hist_counts_inh_exc_1, avg_hist_counts_exc_inh_1, avg_hist_counts_inh_inh_1 = run_sim(1*123, True)
+nodes_ex2, nodes_in2, bin_centers, hist_mean_exc_2, hist_mean_inh_2, spike_times_exc_2, spike_times_inh_2, avg_hist_counts_exc_exc_2, avg_hist_counts_inh_exc_2, avg_hist_counts_exc_inh_2, avg_hist_counts_inh_inh_2 = run_sim(2*123, plotting_flag)
+nodes_ex3, nodes_in3, bin_centers, hist_mean_exc_3, hist_mean_inh_3, spike_times_exc_3, spike_times_inh_3, avg_hist_counts_exc_exc_3, avg_hist_counts_inh_exc_3, avg_hist_counts_exc_inh_3, avg_hist_counts_inh_inh_3 = run_sim(3*123, plotting_flag)
+
+#avg_hist_exc = np.column_stack((hist_mean_exc_1, hist_mean_exc_2, hist_mean_exc_3)).mean(axis=1)
+#avg_hist_inh = np.column_stack((hist_mean_inh_1, hist_mean_inh_2, hist_mean_inh_3)).mean(axis=1)
 
 avg_hist_exc = np.column_stack((hist_mean_exc_1, hist_mean_exc_2, hist_mean_exc_3)).mean(axis=1)
 avg_hist_inh = np.column_stack((hist_mean_inh_1, hist_mean_inh_2, hist_mean_inh_3)).mean(axis=1)
+avg_hist_exc_diff = np.diff(avg_hist_exc)
+avg_hist_inh_diff = np.diff(avg_hist_inh)
+avg_hist_exc_max_value = np.max(avg_hist_exc_diff)
+avg_hist_exc_max_index = np.argmax(avg_hist_exc_diff)
 
+print("Maximum firing rate at the onset (Exc):", avg_hist_exc[avg_hist_exc_max_index+1])
+print("Time value at max value (Exc):", bin_centers[avg_hist_exc_max_index+1])
 
+avg_hist_inh_max_value = np.max(avg_hist_inh_diff)
+avg_hist_inh_max_index = np.argmax(avg_hist_inh_diff)
+
+print("Maximum firing rate at the onset (Inh):", avg_hist_inh[avg_hist_inh_max_index+1])
+print("Time value at max value (Inh):", bin_centers[avg_hist_inh_max_index+1])
+
+print(bin_centers)
+
+avg_hist_exc_exc_2_away = np.column_stack((avg_hist_counts_exc_exc_1, avg_hist_counts_exc_exc_2, avg_hist_counts_exc_exc_3)).mean(axis=1)
+avg_hist_inh_exc_2_away = np.column_stack((avg_hist_counts_inh_exc_1, avg_hist_counts_inh_exc_2, avg_hist_counts_inh_exc_3)).mean(axis=1)
+avg_hist_exc_inh_2_away = np.column_stack((avg_hist_counts_exc_inh_1, avg_hist_counts_exc_inh_2, avg_hist_counts_exc_inh_3)).mean(axis=1)
+avg_hist_inh_inh_2_away = np.column_stack((avg_hist_counts_inh_inh_1, avg_hist_counts_inh_inh_2, avg_hist_counts_inh_inh_3)).mean(axis=1)
 
 
 
 smoothed_data_exc = analyzer.smoothing_kernel(avg_hist_exc)
 smoothed_data_inh = analyzer.smoothing_kernel(avg_hist_inh)
-print(smoothed_data_exc.shape)
-print(smoothed_data_inh.shape)
-print('Finito')
-## Plot the average firing rate over time
-plt.figure()
-plt.plot(np.linspace(0, simtime, len(bin_centers[1:len(smoothed_data_exc)-3])), smoothed_data_exc[1:len(smoothed_data_exc)-3], color='blue')
-plt.plot(bin_centers[1:len(smoothed_data_exc)-3], avg_hist_exc[:len(avg_hist_exc)-1])
-plt.title('Average of Excitatory Neurons Across Trials')
-plt.grid(True)
+smoothed_data_avg_hist_exc_exc_2_away = analyzer.smoothing_kernel(avg_hist_exc_exc_2_away)
+smoothed_data_avg_hist_inh_exc_2_away = analyzer.smoothing_kernel(avg_hist_inh_exc_2_away)
+smoothed_data_avg_hist_exc_inh_2_away = analyzer.smoothing_kernel(avg_hist_exc_inh_2_away)
+smoothed_data_avg_hist_inh_inh_2_away = analyzer.smoothing_kernel(avg_hist_inh_inh_2_away)
+
+# Plot the average firing rate over time
+# Excitatory Neurons
+m_plot.plotting_across_trials(bin_centers, smoothed_data_exc, avg_hist_exc, 0)
+# Inhibitory Neurons
+m_plot.plotting_across_trials(bin_centers, smoothed_data_inh, avg_hist_inh, 1)
 
 
-plt.figure()
-plt.plot(np.linspace(0, simtime, len(bin_centers[1:len(smoothed_data_inh)-3])), smoothed_data_inh[1:len(smoothed_data_inh)-3], color='blue')
-plt.plot(bin_centers[1:len(smoothed_data_inh)-3], avg_hist_exc[:len(avg_hist_inh)-1])
-plt.title('Average of Inhibitory Neurons Across Trials')
-plt.grid(True)
+# Plot average firing rate of excitatory neurons connected to the perturbed neuron
+m_plot.plot_avg_firing_rate(bin_centers, avg_hist_exc_exc_2_away, smoothed_data_avg_hist_exc_exc_2_away, 0)
+# Plot average firing rate of inhibitory neurons connected to the perturbed neuron
+m_plot.plot_avg_firing_rate(bin_centers, avg_hist_inh_exc_2_away, smoothed_data_avg_hist_inh_exc_2_away, 1)
+
+# Plot average firing rate of excitatory neurons connected to the perturbed neuron
+m_plot.plot_avg_firing_rate(bin_centers, avg_hist_exc_inh_2_away, smoothed_data_avg_hist_exc_inh_2_away, 0)
+# Plot average firing rate of inhibitory neurons connected to the perturbed neuron
+m_plot.plot_avg_firing_rate(bin_centers, avg_hist_inh_inh_2_away, smoothed_data_avg_hist_inh_inh_2_away, 1)
+
+
+
 
 plt.show()
 plt.close()
 
-
-'''
-# Plotting Second Edge Neurons Connected to the excitatory neuron which is target to the perturbed one 
-# target ids start from 1
-second_degree_target_exc = nest.GetTargetNodes(nodes_ex[targets_exc[0]-1], nodes_ex)[0]
-second_degree_target_inh = nest.GetTargetNodes(nodes_ex[targets_exc[0]-1], nodes_in)[0]
-
-second_degree_target_exc = second_degree_target_exc.tolist()
-second_degree_target_inh = second_degree_target_inh.tolist()
-print('second_degree_target_exc:', second_degree_target_exc)
-print('second_degree_target_inh:', second_degree_target_inh)
-
-
-
-# Plotting Firing Rate of Excitatory Neuron
-data_exc = spike_times_exc[324-1]
-num_bins = int(simtime/bin_width)
-hist_counts, hist_edges = np.histogram(data_exc, bins=num_bins, range=(min(data), max(data)))
-bin_centers = (hist_edges[:-1] + hist_edges[1:]) / 2
-
-plt.figure('Figure 11')
-plt.plot(bin_centers, hist_counts.T/0.2)
-#plt.legend(targets_inh)
-plt.title("Stim: Second distant Excitatory neuron (CE= {}, CI= {})".format(CE, CI))
-plt.xlabel('Time')
-plt.ylabel('Firing Rate (Hz)')
-
-# Plotting Firing Rate of Excitatory Neuron Using Smoothing Kernel
-data_exc = np.array(data_exc)*ms
-
-spiketrain_sec_distant_exc = neo.SpikeTrain(data_exc, t_start=0 * ms, t_stop=simtime * ms)
-
-# Specify the parameters for the instantaneous_rate function
-sampling_period = 1 * ms
-kernel = 'auto'  # You can specify a specific kernel shape if needed
-cutoff = 5.0 
-# Call the instantaneous_rate function for each neuron's spike train
-rate_analog_signal = es.instantaneous_rate(spiketrain_sec_distant_exc, sampling_period, kernel=kernel, cutoff=cutoff)
-
-# Extract the firing rate values and time axis
-firing_rate_sec_exc = rate_analog_signal.magnitude
-# Create a time axis based on the first spiketrain's duration
-time_axis = np.linspace(0, simtime, len(firing_rate_sec_exc))
-
-# Plot the average firing rate over time
-plt.plot(time_axis, firing_rate_sec_exc, color='blue')
-plt.grid(True)
-
-
-
-
-
-# Plotting Firing Rate of Inhibitory Neuron
-data_inh = spike_times_inh[8461-NE-1]
-num_bins = int(simtime/bin_width)
-hist_counts, hist_edges = np.histogram(data_inh, bins=num_bins, range=(min(data), max(data)))
-bin_centers = (hist_edges[:-1] + hist_edges[1:]) / 2
-
-plt.figure('Figure 12')
-plt.plot(bin_centers, hist_counts.T/0.2)
-#plt.legend(targets_inh)
-plt.title("Stim: Second distant Inhibitory neuron (CE= {}, CI= {})".format(CE, CI))
-plt.xlabel('Time')
-plt.ylabel('Firing Rate (Hz)')
-
-
-# Plotting Firing Rate of Inhibitory Neuron Using Smoothing Kernel
-data_inh = np.array(data_inh)*ms
-
-spiketrain_sec_distant_inh = neo.SpikeTrain(data_inh, t_start=0 * ms, t_stop=simtime * ms)
-
-# Specify the parameters for the instantaneous_rate function
-sampling_period = 1 * ms
-kernel = 'auto'  # You can specify a specific kernel shape if needed
-cutoff = 5.0 
-
-# Call the instantaneous_rate function for each neuron's spike train
-rate_analog_signal = es.instantaneous_rate(spiketrain_sec_distant_inh, sampling_period, kernel=kernel, cutoff=cutoff)
-
-# Extract the firing rate values and time axis
-firing_rate_sec_inh = rate_analog_signal.magnitude
-# Create a time axis based on the first spiketrain's duration
-time_axis = np.linspace(0, simtime, len(firing_rate_sec_inh))
-
-# Plot the average firing rate over time
-plt.plot(time_axis, firing_rate_sec_inh, color='blue')
-plt.grid(True)
-
-
-
-
-
-
-
-
-
-
-
-
-# Plotting Second Edge Neurons Connected to the inhibitory neuron which is target to the perturbed one 
-# target ids start from 1
-second_degree_target_exc_inh = nest.GetTargetNodes(nodes_in[targets_inh[0]-NE-1], nodes_ex)[0]
-second_degree_target_inh_inh = nest.GetTargetNodes(nodes_in[targets_inh[0]-NE-1], nodes_in)[0]
-second_degree_target_exc_inh = second_degree_target_exc_inh.tolist()
-second_degree_target_inh_inh = second_degree_target_inh_inh.tolist()
-print('second_degree_target_exc:', second_degree_target_exc_inh)
-print('second_degree_target_inh:', second_degree_target_inh_inh)
-
-# Plotting Firing Rate of Excitatory Neuron
-data_exc_inh = spike_times_exc[246-1]
-num_bins = int(simtime/bin_width)
-hist_counts, hist_edges = np.histogram(data_exc_inh, bins=num_bins, range=(min(data), max(data)))
-bin_centers = (hist_edges[:-1] + hist_edges[1:]) / 2
-
-
-plt.figure('Figure 13')
-plt.plot(bin_centers, hist_counts.T/0.2)
-#plt.legend(targets_inh)
-plt.title("Stim: Second distant Excitatory neuron (CE= {}, CI= {})".format(CE, CI))
-plt.xlabel('Time')
-plt.ylabel('Firing Rate (Hz)')
-
-# Plotting Firing Rate of Excitatory Neuron Using Smoothing Kernel
-data_exc_inh = np.array(data_exc_inh)*ms
-spiketrain_sec_distant_exc_inh = neo.SpikeTrain(data_exc_inh, t_start=0 * ms, t_stop=simtime * ms)
-
-
-# Specify the parameters for the instantaneous_rate function
-sampling_period = 1 * ms
-kernel = 'auto'  # You can specify a specific kernel shape if needed
-cutoff = 5.0 
-
-
-# Call the instantaneous_rate function for each neuron's spike train
-rate_analog_signal = es.instantaneous_rate(spiketrain_sec_distant_exc_inh, sampling_period, kernel=kernel, cutoff=cutoff)
-# Extract the firing rate values and time axis
-firing_rate_sec_exc_inh = rate_analog_signal.magnitude
-# Create a time axis based on the first spiketrain's duration
-time_axis = np.linspace(0, simtime, len(firing_rate_sec_exc_inh))
-
-# Plot the average firing rate over time
-plt.plot(time_axis, firing_rate_sec_exc_inh, color='blue')
-plt.grid(True)
-
-
-
-
-# Plotting Firing Rate of Inhibitory Neuron
-data_inh_inh = spike_times_inh[8646-NE-1]
-num_bins = int(simtime/bin_width)
-hist_counts, hist_edges = np.histogram(data_inh_inh, bins=num_bins, range=(min(data), max(data)))
-bin_centers = (hist_edges[:-1] + hist_edges[1:]) / 2
-
-plt.figure('Figure 14')
-plt.plot(bin_centers, hist_counts.T/0.2)
-#plt.legend(targets_inh)
-plt.title("Stim: Second distant Inhibitory neuron (CE= {}, CI= {})".format(CE, CI))
-plt.xlabel('Time')
-plt.ylabel('Firing Rate (Hz)')
-
-# Plotting Firing Rate of Inhibitory Neuron Using SMoothing Kernel
-data_inh_inh = np.array(data_inh_inh)*ms
-spiketrain_sec_distant_inh_inh = neo.SpikeTrain(data_inh_inh, t_start=0 * ms, t_stop=simtime * ms)
-
-# Specify the parameters for the instantaneous_rate function
-sampling_period = 1 * ms
-kernel = 'auto'  # You can specify a specific kernel shape if needed
-cutoff = 5.0 
-
-# Call the instantaneous_rate function for each neuron's spike train
-rate_analog_signal = es.instantaneous_rate(spiketrain_sec_distant_inh_inh, sampling_period, kernel=kernel, cutoff=cutoff)
-
-# Extract the firing rate values and time axis
-firing_rate_sec_inh_inh = rate_analog_signal.magnitude
-
-# Create a time axis based on the first spiketrain's duration
-time_axis = np.linspace(0, simtime, len(firing_rate_sec_inh_inh))
-# Plot the average firing rate over time
-plt.plot(time_axis, firing_rate_sec_inh_inh, color='blue')
-plt.grid(True)
-
-
-
-
-#Printing Network Parameters
-print("Brunel network simulation (Python)")
-print(f"Number of neurons : {N_neurons}")
-print(f"Number of synapses: {num_synapses}")
-print(f"       Excitatory : {num_synapses_ex}")
-print(f"       Inhibitory : {num_synapses_in}")
-print(f"Excitatory rate   : {rate_ex:.2f} Hz")
-print(f"Inhibitory rate   : {rate_in:.2f} Hz")
-print(f"Building time     : {build_time:.2f} s")
-print(f"Simulation time   : {sim_time:.2f} s")
-'''
 
 
 
