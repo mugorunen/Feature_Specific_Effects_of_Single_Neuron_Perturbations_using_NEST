@@ -16,7 +16,7 @@ import nest.raster_plot
 
 
 simtime = 20000.0  # Simulation time in ms
-order = 2000
+order = 400
 
 # Define Simulation Parameters
 bin_width = 200.0
@@ -40,12 +40,12 @@ neuron_params = {"C_m": 1.0,
                  "V_reset": 0.0,
                  "V_m": 0.0,
                  "V_th": theta}
-J = 0.5  # postsynaptic amplitude in mV
+J = 1.4  # postsynaptic amplitude in mV
 J_ex = J  # amplitude of excitatory postsynaptic potential
 J_in = -g * J_ex  # amplitude of inhibitory postsynaptic potential
 nu_th = theta / (J * CE * tauMem)
 nu_ex = eta * nu_th
-p_rate = 1000.0 * nu_ex * CE
+p_rate = 1000.0 * nu_ex * CE / 3
 
 
 
@@ -113,8 +113,8 @@ def run_sim(random_seed, plotting_flag):
     
     
     
-    connectivity_matrix = analyzer.create_connectivity(nodes_ex, nodes_in)
-    np.savetxt("connectivity.dat",connectivity_matrix,delimiter="\t",fmt="%1.4f")
+    #connectivity_matrix = analyzer.create_connectivity(nodes_ex, nodes_in)
+    #np.savetxt("connectivity.dat",connectivity_matrix,delimiter="\t",fmt="%1.4f")
 
     
     
@@ -165,32 +165,35 @@ def run_sim(random_seed, plotting_flag):
 
 
     # Calculating firing rates for both populations
-    hist_counts_all_exc, bin_centers_exc, avg_hist_counts_exc, average_firing_rate_exc_elep, firing_rates_smoothed_exc_elep = analyzer.calculating_firing_rates(targets_exc, src_id, spike_times_exc, 0)
+    hist_counts_all_exc, bin_centers_exc, avg_hist_counts_exc = analyzer.calculating_firing_rates(targets_exc, src_id, spike_times_exc, 0)
 
-    hist_counts_all_inh, bin_centers_inh, avg_hist_counts_inh, average_firing_rate_inh_elep, firing_rates_smoothed_inh_elep = analyzer.calculating_firing_rates(targets_inh, src_id, spike_times_inh, 1)
+    hist_counts_all_inh, bin_centers_inh, avg_hist_counts_inh = analyzer.calculating_firing_rates(targets_inh, src_id, spike_times_inh, 1)
 
+    smoothed_data_exc = analyzer.smoothing_kernel(avg_hist_counts_exc)
+    smoothed_data_inh = analyzer.smoothing_kernel(avg_hist_counts_inh)
 
     ctr, src_id, targets_exc, targets_inh = analyzer.find_src_target_ids(nodes_ex, nodes_in)
 
-    nodes_exc_exc_2_away_all, nodes_inh_exc_2_away_all= analyzer.get_nodes_2_nodes_away(ctr, src_id, targets_exc, nodes_ex, nodes_in, 0)
+    second_exc_neuron_id = targets_exc[1]
+    nodes_exc_exc_2_away_all, nodes_inh_exc_2_away_all= analyzer.get_nodes_2_nodes_away(ctr, second_exc_neuron_id, targets_exc, nodes_ex, nodes_in, 0)
 
     nodes_exc_exc_2_away = [x for x in nodes_exc_exc_2_away_all if x not in targets_exc]
     nodes_inh_exc_2_away = [x for x in nodes_inh_exc_2_away_all if x not in targets_inh]
 
     # Calculating firing rates for both populations
-    hist_counts_all_exc, bin_centers_exc, avg_hist_counts_exc_exc, average_firing_rate_exc_exc_elep, firing_rates_smoothed_exc_exc_elep = analyzer.calculating_firing_rates(nodes_exc_exc_2_away, src_id, spike_times_exc, 0)
-    hist_counts_all_inh, bin_centers_inh, avg_hist_counts_inh_exc, average_firing_rate_inh_exc_elep, firing_rates_smoothed_inh_exc_elep = analyzer.calculating_firing_rates(nodes_inh_exc_2_away, src_id, spike_times_inh, 1)
+    hist_counts_all_exc, bin_centers_exc, avg_hist_counts_exc_exc = analyzer.calculating_firing_rates(nodes_exc_exc_2_away, src_id, spike_times_exc, 0)
+    hist_counts_all_inh, bin_centers_inh, avg_hist_counts_inh_exc = analyzer.calculating_firing_rates(nodes_inh_exc_2_away, src_id, spike_times_inh, 1)
 
 
-
-    nodes_exc_inh_2_away_all, nodes_inh_inh_2_away_all= analyzer.get_nodes_2_nodes_away(ctr, src_id, targets_inh, nodes_ex, nodes_in, 1)
+    second_inh_neuron_id = targets_inh[1]
+    nodes_exc_inh_2_away_all, nodes_inh_inh_2_away_all= analyzer.get_nodes_2_nodes_away(ctr, second_inh_neuron_id, targets_exc, nodes_ex, nodes_in, 1)
 
     nodes_exc_inh_2_away = [x for x in nodes_exc_inh_2_away_all if x not in targets_exc]
     nodes_inh_inh_2_away = [x for x in nodes_inh_inh_2_away_all if x not in targets_inh]
 
     # Calculating firing rates for both populations
-    hist_counts_all_exc, bin_centers_exc, avg_hist_counts_exc_inh, average_firing_rate_exc_inh_elep, firing_rates_smoothed_exc_inh_elep = analyzer.calculating_firing_rates(nodes_exc_inh_2_away, src_id, spike_times_exc, 0)
-    hist_counts_all_inh, bin_centers_inh, avg_hist_counts_inh_inh, average_firing_rate_inh_inh_elep, firing_rates_smoothed_inh_inh_elep = analyzer.calculating_firing_rates(nodes_inh_inh_2_away, src_id, spike_times_inh, 1)
+    hist_counts_all_exc, bin_centers_exc, avg_hist_counts_exc_inh = analyzer.calculating_firing_rates(nodes_exc_inh_2_away, src_id, spike_times_exc, 0)
+    hist_counts_all_inh, bin_centers_inh, avg_hist_counts_inh_inh = analyzer.calculating_firing_rates(nodes_inh_inh_2_away, src_id, spike_times_inh, 1)
 
 
 
@@ -199,7 +202,7 @@ def run_sim(random_seed, plotting_flag):
 
         m_plot.plot_spatial_connections(nodes_ex, ctr)
         # Plot source connectivity matrix
-        m_plot.plot_connectivity(connectivity_matrix)
+        #m_plot.plot_connectivity(connectivity_matrix)
         # Plot raster plot
         m_plot.plot_raster_plot(sr1_spikes, sr1_times, sr2_spikes, sr2_times)
         # Plot CV of excitatory neurons
@@ -209,9 +212,9 @@ def run_sim(random_seed, plotting_flag):
         # Plot histogram plot of perturbed neuron
         m_plot.plot_hist_perturbed(spike_times_exc, src_id)
         # Plot average firing rate of excitatory neurons connected to the perturbed neuron
-        m_plot.plot_avg_firing_rate(bin_centers_exc, avg_hist_counts_exc, average_firing_rate_exc_elep, 0)
+        m_plot.plot_avg_firing_rate(bin_centers_exc, avg_hist_counts_exc, smoothed_data_exc, 0)
         # Plot average firing rate of inhibitory neurons connected to the perturbed neuron
-        m_plot.plot_avg_firing_rate(bin_centers_inh, avg_hist_counts_inh, average_firing_rate_inh_elep, 1)
+        m_plot.plot_avg_firing_rate(bin_centers_inh, avg_hist_counts_inh, smoothed_data_inh, 1)
         # Plot one example of excitatory neuron connected to the perturbed neuron
         #m_plot.plot_example_neuron(bin_centers_exc, hist_counts_all_exc[2].T, firing_rates_smoothed_exc_elep[2], 0)
         # Plot one example of inhibitory neuron connected to the perturbed neuron

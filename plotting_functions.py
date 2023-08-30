@@ -100,7 +100,7 @@ class PlottingFuncs:
     def plot_hist_perturbed(self, spike_times_exc, src_id):
         spike_times_exc = np.array(spike_times_exc)
         #Plot the histogram of the Perturbed Neuron
-        plt.figure('Figure 5')
+        plt.figure()
         # Create a histogram plot for excitatory neurons
         plt.hist(spike_times_exc[src_id-1], bins=int(self.simtime/self.bin_width), edgecolor='black')  # Adjust the number of bins as needed
         plt.xlabel("Value")

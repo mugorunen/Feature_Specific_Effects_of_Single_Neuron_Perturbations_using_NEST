@@ -84,26 +84,9 @@ class NetworkAnalyzer:
         hist_counts_all = np.array(hist_counts_all)
         avg_hist_counts = hist_counts_all.T.mean(axis=1)
 
-        # Plot the mean firing rate of the Excitatory Neurons Connected to the Perturbed One Using Smoothing Kernel
-        elep_spike_times = np.array(elep_spike_times)*ms
-        spiketrains = [neo.SpikeTrain(times, t_start=0 * ms, t_stop=self.simtime * ms) for times in elep_spike_times]
-
-        # Specify the parameters for the instantaneous_rate function
-        sampling_period = 1 * ms
-        kernel = 'auto'  # You can specify a specific kernel shape if needed
-        cutoff = 5.0 
-
-        # Call the instantaneous_rate function for each neuron's spike train
-        firing_rates_smoothed = []
-        for spiketrain in spiketrains:
-            rate_analog_signal = es.instantaneous_rate(spiketrain, sampling_period, kernel=kernel, cutoff=cutoff)
-            firing_rates_smoothed.append(rate_analog_signal.magnitude)
-
-        # Calculate the average firing rate across neurons for each time step
-        average_firing_rate = np.mean(firing_rates_smoothed, axis=0)
 
 
-        return hist_counts_all, bin_centers, avg_hist_counts, average_firing_rate, firing_rates_smoothed
+        return hist_counts_all, bin_centers, avg_hist_counts
     
     def smoothing_kernel(self, mean_hist):
         # Define the smoothing kernel (e.g., Gaussian kernel)
@@ -139,23 +122,17 @@ class NetworkAnalyzer:
 
         return ctr, src_id, targets_exc, targets_inh
     
-    def get_nodes_2_nodes_away(self, ctr, src_id, targets, nodes_ex, nodes_in, neuron_type):
+    def get_nodes_2_nodes_away(self, ctr, neuron_id, targets, nodes_ex, nodes_in, neuron_type):
 
-        nodes_exc_2_away = set()  # Use a set to avoid duplicates
-        nodes_inh_2_away = set()  # Use a set to avoid duplicates
+        if neuron_type==0:
+            target_2_exc = nest.GetTargetNodes(nodes_ex[neuron_id-1], nodes_ex)[0]
+            target_2_inh = nest.GetTargetNodes(nodes_ex[neuron_id-1], nodes_in)[0]
+        else:
+            target_2_exc = nest.GetTargetNodes(nodes_in[neuron_id-self.NE-1], nodes_ex)[0]
+            target_2_inh = nest.GetTargetNodes(nodes_in[neuron_id-self.NE-1], nodes_in)[0]
 
-        for id in targets:
-            if neuron_type==0:
-                target_2_exc = nest.GetTargetNodes(nodes_ex[id-1], nodes_ex)[0]
-                target_2_inh = nest.GetTargetNodes(nodes_ex[id-1], nodes_in)[0]
-            else:
-                target_2_exc = nest.GetTargetNodes(nodes_in[id-self.NE-1], nodes_ex)[0]
-                target_2_inh = nest.GetTargetNodes(nodes_in[id-self.NE-1], nodes_in)[0]
 
-            # Update the sets with individual values from the tuples
-            nodes_exc_2_away.update(target_2_exc.tolist())
-            nodes_inh_2_away.update(target_2_inh.tolist())
     
-        return list(nodes_exc_2_away), list(nodes_inh_2_away)
+        return target_2_exc.tolist(), target_2_inh.tolist()
 
 
