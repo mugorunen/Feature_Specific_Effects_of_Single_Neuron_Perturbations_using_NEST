@@ -39,7 +39,8 @@ class NetworkAnalyzer:
         return CoV
 
     def create_connectivity(self, nodes_ex, nodes_in):
-        connectivity = np.zeros((self.N_neurons, self.N_neurons))
+        connectivity_target = np.zeros((self.N_neurons, self.N_neurons))
+        connectivity_source = np.zeros((self.N_neurons, self.N_neurons))
         conn_ex = nest.GetConnections(nodes_ex)
         conn_ex_source = nest.GetStatus(conn_ex, keys='source')
         conn_ex_target = nest.GetStatus(conn_ex, keys='target')
@@ -51,13 +52,16 @@ class NetworkAnalyzer:
 
         for i in range(len(conn_ex_source)):
             if conn_ex_source[i] <= self.N_neurons and conn_ex_target[i] <= self.N_neurons:
-                connectivity[conn_ex_source[i] - 1, conn_ex_target[i] - 1] = conn_ex_weight[i]
+                connectivity_target[conn_ex_source[i] - 1, conn_ex_target[i] - 1] = conn_ex_weight[i]
+                connectivity_source[conn_ex_target[i] - 1, conn_ex_source[i] - 1] = conn_ex_weight[i]
         for i in range(len(conn_in_source)):
             if conn_in_source[i] <= self.N_neurons and conn_in_target[i] <= self.N_neurons:
-                connectivity[conn_in_source[i] - 1, conn_in_target[i] - 1] = conn_in_weight[i]
+                connectivity_target[conn_in_source[i] - 1, conn_in_target[i] - 1] = conn_in_weight[i]
+                connectivity_source[conn_in_target[i] - 1, conn_in_source[i] - 1] = conn_in_weight[i]
 
-        connectivity_matrix = connectivity.T
-        return connectivity_matrix
+        connectivity_target_matrix = connectivity_target.T
+        connectivity_source_matrix = connectivity_source.T
+        return connectivity_target_matrix, connectivity_source_matrix
     
     def calculating_firing_rates(self, targets, src_id, spike_times, neuron_type):
          # Plot the mean firing rate of the Excitatory Neurons Connected to the Perturbed One

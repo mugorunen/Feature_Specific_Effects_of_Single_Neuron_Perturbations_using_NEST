@@ -53,30 +53,15 @@ class PlottingFuncs:
 
     def plot_connectivity(self, connectivity_matrix):
         # Normalize the values for colormap mapping
-        norm = Normalize(vmin=np.min(connectivity_matrix), vmax=np.max(connectivity_matrix))
-        colormap = plt.get_cmap('viridis')  # Choose a colormap (e.g., 'viridis')
-
-        # Create the connection plot
-        plt.figure(figsize=(10, 10))
-        for row in range(connectivity_matrix.shape[0]):
-            for col in range(connectivity_matrix.shape[1]):
-                if connectivity_matrix[row, col] != 0:  # Plot only connections with non-zero values
-                    color = colormap(norm(connectivity_matrix[row, col]))
-                    plt.plot([col], [self.N_neurons - row], marker='o', markersize=5, color=color)
-
-        # Customize the plot
-        sm = ScalarMappable(cmap=colormap, norm=norm)
-        sm.set_array([])  # Prevents error in colorbar
-        plt.colorbar(sm, label='Amplitude')  # Add colorbar with amplitude label
-        plt.xlim(0, self.N_neurons)
-        plt.ylim(0, self.N_neurons)
-        plt.gca().invert_yaxis()
-        plt.title("Connection Plot with Colormap")
-        plt.xlabel("Column Index")
-        plt.ylabel("Row Index")
+        # Plot the array using imshow
+        plt.figure()
+        plt.imshow(connectivity_matrix, cmap='viridis', interpolation='nearest')
+        # Add color scale bar with legend
+        colorbar = plt.colorbar()
+        colorbar.set_label('Value')
 
     def plot_raster_plot(self, sr1_spikes, sr1_times, sr2_spikes, sr2_times):
-        plt.figure('Figure 3')
+        plt.figure()
 
         plt.plot(sr1_times, sr1_spikes,
                 '.', markersize=1, color='blue', label='Exc')
@@ -123,7 +108,7 @@ class PlottingFuncs:
         time_axis = np.linspace(0, self.simtime, len(average_firing_rate))
     
         # Plot the average firing rate over time
-        plt.plot(time_axis, average_firing_rate, color='blue')
+        plt.plot(bin_centers, average_firing_rate, color='blue')
         plt.grid(True)
 
     
@@ -147,7 +132,7 @@ class PlottingFuncs:
 
     def plotting_across_trials(self, bin_centers, smoothed_data, avg_hist, neuron_type):
         plt.figure()
-        plt.plot(np.linspace(0, self.simtime, len(bin_centers)), smoothed_data, color='blue')
+        plt.plot(bin_centers, smoothed_data, color='blue')
         plt.plot(bin_centers, avg_hist)
         if neuron_type==0:
             plt.title('Average of Excitatory Neurons Across Trials')
