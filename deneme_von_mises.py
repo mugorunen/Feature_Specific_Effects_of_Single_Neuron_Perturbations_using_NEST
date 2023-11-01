@@ -16,7 +16,7 @@ import networkx as nx
 import nest
 import nest.raster_plot
 
-simtime = 20000.0  # Simulation time in ms
+simtime = 30000.0  # Simulation time in ms
 order = 400
 
 # Define Simulation Parameters
@@ -48,7 +48,7 @@ J_in = -g * J_ex  # amplitude of inhibitory postsynaptic potential
 connection_seed=70
 
 # Define parameters
-preferred_direction = 1.3*np.pi / 4  # Preferred direction (e.g., 45 degrees)
+preferred_direction = 1*np.pi / 4  # Preferred direction (e.g., 45 degrees)
 
 # Generate stimulus directions from 0 to 2*pi radians
 pyrng_gen = np.random.RandomState(connection_seed)
@@ -58,6 +58,7 @@ pyrng_gen = np.random.RandomState(connection_seed)
 pref_angles_p_exc = np.linspace(-np.pi/2, np.pi/2, NE)
 pref_angles_p_inh = np.linspace(-np.pi/2, np.pi/2, NI)
 
+#SEED DEGISTIRMEK ETKI EDER MI?
 np.random.seed(13)
 np.random.shuffle(pref_angles_p_exc)
 np.random.shuffle(pref_angles_p_inh)
@@ -211,8 +212,8 @@ def run_sim(random_seed, plotting_flag, sim):
     # Create excitatory neurons, inhibitory neurons, poisson spike generator, and spike recorders
     nodes_ex = nest.Create("iaf_psc_delta", NE, params=neuron_params, positions=pos_ex)
     nodes_in = nest.Create("iaf_psc_delta", NI, params=neuron_params, positions=pos_ex)
-    espikes = nest.Create("spike_recorder", params={"start": 3000.0, "stop":20000.0})
-    ispikes = nest.Create("spike_recorder", params={"start": 3000.0, "stop":20000.0})
+    espikes = nest.Create("spike_recorder", params={"start": 3000.0, "stop":30000.0})
+    ispikes = nest.Create("spike_recorder", params={"start": 3000.0, "stop":30000.0})
 
     #Define the Synapses
     nest.CopyModel("static_synapse", "excitatory", {"weight": J_ex, "delay": delay})
@@ -391,7 +392,7 @@ m_plot = PlottingFuncs(N_neurons, simtime, bin_width, CE, CI)
 
 plotting_flag = False
 # Define the number of runs
-num_runs = 4
+num_runs = 10
 
 # Lists to store the results
 nodes_ex = []
@@ -460,7 +461,9 @@ plt.figure()
 #plt.plot(dd_nosim*180/np.pi, pp)
 plt.plot(np.squeeze(dd_values), analyzer.smoothing_kernel(pp_nosim), label="nosim")
 plt.plot(np.squeeze(dd_values), analyzer.smoothing_kernel(pp_sim), label="sim")
-# Add a legend
+plt.xlabel("Orientation Preference in radian")
+plt.ylabel("Average firing rate of neurons")
+plt.title("Stim Angle: {}".format(preferred_direction*180/np.pi))
 plt.legend()
 
 plt.show()
