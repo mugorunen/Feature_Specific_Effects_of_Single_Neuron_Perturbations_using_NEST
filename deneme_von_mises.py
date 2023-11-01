@@ -45,23 +45,26 @@ J = 1  # postsynaptic amplitude in mV
 J_ex = J  # amplitude of excitatory postsynaptic potential
 J_in = -g * J_ex  # amplitude of inhibitory postsynaptic potential
 
-connection_seed=44
+connection_seed=70
 
 # Define parameters
-preferred_direction = 1.*np.pi / 4  # Preferred direction (e.g., 45 degrees)
+preferred_direction = 1.3*np.pi / 4  # Preferred direction (e.g., 45 degrees)
 
 # Generate stimulus directions from 0 to 2*pi radians
 pyrng_gen = np.random.RandomState(connection_seed)
 
-pref_angles_p_exc = pyrng_gen.uniform(-np.pi/2, np.pi/2, NE)
-pref_angles_p_inh = pyrng_gen.uniform(-np.pi/2, np.pi/2, NI)
-#pref_angles_p_exc = np.linspace(-np.pi/2, np.pi/2, NE)
-#pref_angles_p_inh = np.linspace(-np.pi/2, np.pi/2, NI)
+#pref_angles_p_exc = pyrng_gen.uniform(-np.pi/2, np.pi/2, NE)
+#pref_angles_p_inh = pyrng_gen.uniform(-np.pi/2, np.pi/2, NI)
+pref_angles_p_exc = np.linspace(-np.pi/2, np.pi/2, NE)
+pref_angles_p_inh = np.linspace(-np.pi/2, np.pi/2, NI)
 
-kappa=10
+np.random.seed(13)
+np.random.shuffle(pref_angles_p_exc)
+np.random.shuffle(pref_angles_p_inh)
+kappa_1=10
 # Generate the tuning curve
-tuning_curve_exc = vonmises.pdf(2*pref_angles_p_exc, kappa, 2*preferred_direction)
-tuning_curve_inh = vonmises.pdf(2*pref_angles_p_inh, kappa, 2*preferred_direction)
+tuning_curve_exc = vonmises.pdf(2*pref_angles_p_exc, kappa_1, 2*preferred_direction)
+tuning_curve_inh = vonmises.pdf(2*pref_angles_p_inh, kappa_1, 2*preferred_direction)
 
 
 
@@ -69,25 +72,25 @@ I_max = 4000
 
 rates_exc = I_max*tuning_curve_exc/np.max(tuning_curve_exc)+I_max/4
 rates_inh = I_max*tuning_curve_inh/np.max(tuning_curve_inh)+I_max/4
-plt.plot(range(NE), rates_exc)
-plt.show()
-# Plot the tuning curve
-plt.figure()
-plt.plot(pref_angles_p_exc, tuning_curve_exc)
-plt.xlabel("Stimulus Direction (radians)")
-plt.ylabel("Current")
-plt.title("von Mises Tuning Curve")
-
-plt.figure()
-plt.plot(pref_angles_p_exc, rates_exc)
-plt.xlabel("Stimulus Direction (radians)")
-plt.ylabel("Current")
-plt.title("von Mises Tuning Curve")
-
-
-
-
-plt.show()
+#plt.plot(range(NE), rates_exc)
+#plt.show()
+## Plot the tuning curve
+#plt.figure()
+#plt.plot(pref_angles_p_exc, tuning_curve_exc)
+#plt.xlabel("Stimulus Direction (radians)")
+#plt.ylabel("Current")
+#plt.title("von Mises Tuning Curve")
+#
+#plt.figure()
+#plt.plot(pref_angles_p_exc, rates_exc)
+#plt.xlabel("Stimulus Direction (radians)")
+#plt.ylabel("Current")
+#plt.title("von Mises Tuning Curve")
+#
+#
+#
+#
+#plt.show()
 
 #plt.show()
 #rates_exc = 20*th_rate * (1 + m_tmp*np.cos(2*(stim_angle-pref_angles_p_exc)))
@@ -133,19 +136,20 @@ k=4
 #        else:
 #            ww_II[i, j] = -2*A * np.exp(-k * (pref_angles_p_inh[i]-pref_angles_p_inh[j]) ** 2)
 
+kappa_2 = 10
 p = 0.3
 for i in range(NE):
-    ww_EE[i, :] = p*vonmises.pdf(2*pref_angles_p_exc, kappa, 2*pref_angles_p_exc[i])
+    ww_EE[i, :] = p*vonmises.pdf(2*pref_angles_p_exc, kappa_2, 2*pref_angles_p_exc[i])
     
 
 for i in range(NE):
-    ww_EI[i, :] = p*vonmises.pdf(2*pref_angles_p_exc, kappa, 2*pref_angles_p_inh[i])
+    ww_EI[i, :] = p*vonmises.pdf(2*pref_angles_p_exc, kappa_2, 2*pref_angles_p_inh[i])
 
 for i in range(NI):
-    ww_IE[i, :] = -2*p*vonmises.pdf(2*pref_angles_p_inh, kappa, 2*pref_angles_p_exc[i])
+    ww_IE[i, :] = -2*p*vonmises.pdf(2*pref_angles_p_inh, kappa_2, 2*pref_angles_p_exc[i])
 
 for i in range(NI):
-    ww_II[i, :] = -2*p*vonmises.pdf(2*pref_angles_p_inh, kappa, 2*pref_angles_p_inh[i])
+    ww_II[i, :] = -2*p*vonmises.pdf(2*pref_angles_p_inh, kappa_2, 2*pref_angles_p_inh[i])
 
 
 #ww_EE = ww_EE.tolist()
@@ -156,16 +160,16 @@ for i in range(NI):
 nu_th = theta / (J * CE * tauMem)
 nu_ex = eta * nu_th
 p_rate = 1000.0 * nu_ex * CE / 3
-
+'''
 # Create a figure with two subplots side by side
 fig, axes = plt.subplots(1, 2, figsize=(10, 5))
 
 # Plot the first array in the first subplot
-axes[0].imshow(ww_EE, cmap='viridis', interpolation='nearest')
+axes[0].imshow(ww_EI, cmap='viridis', interpolation='nearest')
 axes[0].set_title('Array 1')
 
 # Plot the second array in the second subplot
-axes[1].imshow(ww_II, cmap='plasma', interpolation='nearest')
+axes[1].imshow(ww_IE, cmap='plasma', interpolation='nearest')
 axes[1].set_title('Array 2')
 
 # Add color bars (optional)
@@ -179,7 +183,7 @@ plt.tight_layout()
 
 # Show the plot
 plt.show()
-
+'''
 
 def run_sim(random_seed, plotting_flag, sim):
     # Reset previous simulations
