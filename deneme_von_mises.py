@@ -48,7 +48,7 @@ J_in = -g * J_ex  # amplitude of inhibitory postsynaptic potential
 connection_seed=70
 
 # Define parameters
-preferred_direction = 1*np.pi / 4  # Preferred direction (e.g., 45 degrees)
+preferred_direction = 0*np.pi / 4  # Preferred direction (e.g., 45 degrees)
 
 # Generate stimulus directions from 0 to 2*pi radians
 pyrng_gen = np.random.RandomState(connection_seed)
@@ -62,7 +62,7 @@ pref_angles_p_inh = np.linspace(-np.pi/2, np.pi/2, NI)
 np.random.seed(13)
 np.random.shuffle(pref_angles_p_exc)
 np.random.shuffle(pref_angles_p_inh)
-kappa_1=10
+kappa_1=100
 # Generate the tuning curve
 tuning_curve_exc = vonmises.pdf(2*pref_angles_p_exc, kappa_1, 2*preferred_direction)
 tuning_curve_inh = vonmises.pdf(2*pref_angles_p_inh, kappa_1, 2*preferred_direction)
@@ -71,8 +71,10 @@ tuning_curve_inh = vonmises.pdf(2*pref_angles_p_inh, kappa_1, 2*preferred_direct
 
 I_max = 4000
 
-rates_exc = I_max*tuning_curve_exc/np.max(tuning_curve_exc)+I_max/4
-rates_inh = I_max*tuning_curve_inh/np.max(tuning_curve_inh)+I_max/4
+#rates_exc = I_max*tuning_curve_exc/np.max(tuning_curve_exc)+I_max/4
+#rates_inh = I_max*tuning_curve_inh/np.max(tuning_curve_inh)+I_max/4
+#rates_exc = 1000
+#rates_inh = 1000
 #plt.plot(range(NE), rates_exc)
 #plt.show()
 ## Plot the tuning curve
@@ -199,7 +201,13 @@ def run_sim(random_seed, plotting_flag, sim):
     nest.resolution = dt
     nest.print_time = True
     nest.overwrite_files = True
-    
+
+    if sim==True:
+        rates_exc = I_max/4
+        rates_inh = I_max/4
+    else:
+        rates_exc = I_max/4
+        rates_inh = I_max/4
 
     print("Building network")
     #Define Connection Parameters
@@ -232,38 +240,63 @@ def run_sim(random_seed, plotting_flag, sim):
     #noise = nest.Create("poisson_generator", params={"rate": p_rate})
 
     # Connect Noise Generators 
-    nest.Connect(noise_exc, nodes_ex, syn_spec="excitatory")
-    nest.Connect(noise_inh, nodes_in, syn_spec="excitatory")
+    nest.Connect(noise_exc, nodes_ex)
+    nest.Connect(noise_inh, nodes_in)
     #nest.Connect(noise, nodes_ex, syn_spec="excitatory")
     #nest.Connect(noise, nodes_in, syn_spec="excitatory")
 
     # Connect recorders
-    nest.Connect(nodes_ex, espikes, syn_spec="excitatory")
-    nest.Connect(nodes_in, ispikes, syn_spec="excitatory")
+    nest.Connect(nodes_ex, espikes)
+    nest.Connect(nodes_in, ispikes)
 
 
-
-
-    ctr, src_id, targets_exc, targets_inh = analyzer.find_src_target_ids(nodes_ex, nodes_in)
     kl = abs(preferred_direction-pref_angles_p_exc)
     min_arr = np.argmin(kl)
     print(pref_angles_p_exc[min_arr])
     src_id=min_arr+1    
 
+    base_amplitude=20.0
     # Create Simulator and Connect it
-    amplitude=160.0
-    stim_params = {"amplitude": amplitude, "start": 5150.0, "stop": 48150.0}
-    stimulator = nest.Create("dc_generator", params=stim_params)
+    t=0.1
+    amplitude= vonmises.pdf(2*pref_angles_p_exc, kappa_1, 2*pref_angles_p_exc[min_arr])
+    amplitude = t*amplitude*base_amplitude/np.max(amplitude)
+
+    print(np.max(amplitude))
+
+    #plt.figure()
+    #plt.plot(pref_angles_p_exc, amplitude)
+    #plt.xlabel("Stimulus Direction (radians)")
+    #plt.ylabel("Current")
+    #plt.title("von Mises Tuning Curve")
+    #
+    #
+    #
+    #
+    #
+    #plt.show()
+
+
+    
+    
+    stim_params_1 = {"amplitude": 160.0, "start": 5150.0, "stop": 48150.0}
+    stim_1= nest.Create("dc_generator", params=stim_params_1)
 
 
     # Connect the stimulator to the neuron
     
     if sim==True:
-        nest.Connect(stimulator, nodes_ex[src_id-1])
+        print('KK')
+        for i in range(400):
+            
+            stim_params = {"amplitude": amplitude[i], "start": 5150.0, "stop": 48150.0}
+            stimulator = nest.Create("dc_generator", params=stim_params)
+            nest.Connect(stimulator, nodes_ex[i])
+            nest.Connect(stimulator, nodes_in[i])
+
+        nest.Connect(stim_1, nodes_ex[src_id-1])
         
-    tt = [i-1 for i in targets_exc]
-    pp = [i-1 for i in targets_inh]
-    
+    ctr, src_id, targets_exc, targets_inh = analyzer.find_src_target_ids(nodes_ex, nodes_in)
+    src_id = min_arr+1
     if (plotting_flag):
         connectivity_target_matrix, connectivity_source_matrix = analyzer.create_connectivity(nodes_ex, nodes_in)
         np.savetxt("connectivity_target.dat",connectivity_target_matrix,delimiter="\t",fmt="%1.4f")
@@ -362,15 +395,15 @@ def run_sim(random_seed, plotting_flag, sim):
         #m_plot.plot_connectivity(connectivity_second_degree)
         #m_plot.plot_connectivity(connectivity_third_degree)
         # Plot raster plot
-        m_plot.plot_raster_plot(sr1_spikes, sr1_times, sr2_spikes, sr2_times)
+        #m_plot.plot_raster_plot(sr1_spikes, sr1_times, sr2_spikes, sr2_times)
         # Plot CV of excitatory neurons
-        m_plot.plot_CV_plot(CoV_exc, 0)
+        #m_plot.plot_CV_plot(CoV_exc, 0)
         # Plot CV of inhibitory neurons
-        m_plot.plot_CV_plot(CoV_inh, 1)
+        #m_plot.plot_CV_plot(CoV_inh, 1)
         # Plot histogram plot of perturbed neuron
         #m_plot.plot_hist_perturbed(spike_times_exc, src_id)
         # Plot average firing rate of excitatory neurons connected to the perturbed neuron
-        #m_plot.plot_avg_firing_rate(bin_centers_exc, avg_hist_counts_exc, smoothed_data_exc, 0)
+        m_plot.plot_avg_firing_rate(bin_centers_exc, avg_hist_counts_exc, smoothed_data_exc, 0)
         # Plot average firing rate of inhibitory neurons connected to the perturbed neuron
         #m_plot.plot_avg_firing_rate(bin_centers_inh, avg_hist_counts_inh, smoothed_data_inh, 1)
         # Plot one example of excitatory neuron connected to the perturbed neuron
@@ -379,7 +412,7 @@ def run_sim(random_seed, plotting_flag, sim):
         #m_plot.plot_example_neuron(bin_centers_inh, deneme[1].T, analyzer.smoothing_kernel(deneme[1]).T, 1)
 
 
-
+        #plt.show()
 
     return nodes_ex, nodes_in, bin_centers_exc, avg_hist_counts_exc, avg_hist_counts_inh, spike_times_exc, spike_times_inh, ss[diff_new_indices], diff_new[diff_new_indices]
 
@@ -392,7 +425,7 @@ m_plot = PlottingFuncs(N_neurons, simtime, bin_width, CE, CI)
 
 plotting_flag = False
 # Define the number of runs
-num_runs = 10
+num_runs = 4
 
 # Lists to store the results
 nodes_ex = []
@@ -415,6 +448,7 @@ for i in range(1, num_runs + 1):
     spike_times_inh.append(spike_times_inh_i)
     ss.append(ss_i)
     dd.append(dd_i)
+
 
 # Calculate averages for hist_mean_exc and hist_mean_inh
 avg_hist_exc = np.column_stack(hist_mean_exc).mean(axis=1)
@@ -444,15 +478,21 @@ m_plot.plot_avg_firing_rate(bin_centers, avg_hist_exc, smoothed_data_exc, 0)
 m_plot.plot_avg_firing_rate(bin_centers, avg_hist_inh, smoothed_data_inh, 1)
 
 
-ind = num_runs//2+1
+ind = num_runs//2
+print(ind)
 # Continue with the rest of your analysis or code as needed
-pp_nosim = np.column_stack(ss[1:ind]).mean(axis=1)
+pp_nosim = np.column_stack(ss[0:ind]).mean(axis=1)
 
-pp_sim = np.column_stack(ss[ind:num_runs+1]).mean(axis=1)
+pp_sim = np.column_stack(ss[ind:num_runs]).mean(axis=1)
+
 
 # Assuming dd[1:2] is a list of values
-dd_values = dd[1:2]
-
+dd_values = dd[0:1]
+#plt.figure()
+#plt.plot(np.squeeze(dd_values), analyzer.smoothing_kernel(np.column_stack(ss[0:1]).mean(axis=1)), label="1")
+#plt.plot(np.squeeze(dd_values), analyzer.smoothing_kernel(np.column_stack(ss[2:3]).mean(axis=1)), label="2")
+#plt.plot(np.squeeze(dd_values), analyzer.smoothing_kernel(np.column_stack(ss[3:4]).mean(axis=1)), label="3")
+#plt.plot(np.squeeze(dd_values), analyzer.smoothing_kernel(np.column_stack(ss[4:5]).mean(axis=1)), label="4")
 
 # Divide each element by 180.0 and apply np.pi
 dd_values = [x * 180.0 / np.pi  for x in dd_values]
@@ -461,7 +501,7 @@ plt.figure()
 #plt.plot(dd_nosim*180/np.pi, pp)
 plt.plot(np.squeeze(dd_values), analyzer.smoothing_kernel(pp_nosim), label="nosim")
 plt.plot(np.squeeze(dd_values), analyzer.smoothing_kernel(pp_sim), label="sim")
-plt.xlabel("Orientation Preference in radian")
+plt.xlabel("Orientation Preference in Degrees")
 plt.ylabel("Average firing rate of neurons")
 plt.title("Stim Angle: {}".format(preferred_direction*180/np.pi))
 plt.legend()
