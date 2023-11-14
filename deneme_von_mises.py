@@ -253,8 +253,10 @@ def run_sim(random_seed, plotting_flag, sim):
     kl = abs(preferred_direction-pref_angles_p_exc)
     min_arr = np.argmin(kl)
     print(pref_angles_p_exc[min_arr])
+
     src_id=min_arr+1    
 
+    # 20.0, 5.0 2.5
     base_amplitude=20.0
     # Create Simulator and Connect it
     t=0.1
