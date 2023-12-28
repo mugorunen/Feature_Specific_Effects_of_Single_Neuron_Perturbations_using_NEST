@@ -16,7 +16,7 @@ import networkx as nx
 import nest
 import nest.raster_plot
 
-simtime = 30000.0  # Simulation time in ms
+simtime = 20000.0  # Simulation time in ms
 order = 400
 
 # Define Simulation Parameters
@@ -71,33 +71,6 @@ tuning_curve_inh = vonmises.pdf(2*pref_angles_p_inh, kappa_1, 2*preferred_direct
 
 I_max = 4000
 
-#rates_exc = I_max*tuning_curve_exc/np.max(tuning_curve_exc)+I_max/4
-#rates_inh = I_max*tuning_curve_inh/np.max(tuning_curve_inh)+I_max/4
-#rates_exc = 1000
-#rates_inh = 1000
-#plt.plot(range(NE), rates_exc)
-#plt.show()
-## Plot the tuning curve
-#plt.figure()
-#plt.plot(pref_angles_p_exc, tuning_curve_exc)
-#plt.xlabel("Stimulus Direction (radians)")
-#plt.ylabel("Current")
-#plt.title("von Mises Tuning Curve")
-#
-#plt.figure()
-#plt.plot(pref_angles_p_exc, rates_exc)
-#plt.xlabel("Stimulus Direction (radians)")
-#plt.ylabel("Current")
-#plt.title("von Mises Tuning Curve")
-#
-#
-#
-#
-#plt.show()
-
-#plt.show()
-#rates_exc = 20*th_rate * (1 + m_tmp*np.cos(2*(stim_angle-pref_angles_p_exc)))
-#rates_inh = 20*th_rate * (1 + m_tmp*np.cos(2*(stim_angle-pref_angles_p_inh)))
 ww_EE = np.zeros((NE, NE))
 ww_EI = np.zeros((NE, NI))
 ww_IE = np.zeros((NI, NE))
@@ -106,94 +79,36 @@ ww_II = np.zeros((NI, NI))
 A=1
 k=4
 
-#plt.figure()
-#plt.plot(stim_angle-pref_angles_p_exc)
-#plt.show()
 
-
-
-#for i in range(NE):
-#    for j in range(NE):
-#        if False:
-#            ww_EE[i, j] = 0
-#        else:
-#            ww_EE[i, j] = A * np.exp(-k * (pref_angles_p_exc[i]-pref_angles_p_exc[j]) ** 2)
-#
-#for i in range(NE):
-#    for j in range(NI):
-#        if False:
-#            ww_EI[i, j] = 0
-#        else:
-#            ww_EI[i, j] = A * np.exp(-k * (pref_angles_p_exc[i]-pref_angles_p_inh[j]) ** 2)
-#for i in range(NI):
-#    for j in range(NE):
-#        if False:
-#            ww_IE[i, j] = 0
-#        else:
-#            ww_IE[i, j] = -2*A * np.exp(-k * (pref_angles_p_inh[i]-pref_angles_p_exc[j]) ** 2)
-#
-#for i in range(NI):
-#    for j in range(NI):
-#        if False:
-#            ww_II[i, j] = 0
-#        else:
-#            ww_II[i, j] = -2*A * np.exp(-k * (pref_angles_p_inh[i]-pref_angles_p_inh[j]) ** 2)
 
 kappa_2 = 10
-p = 0.3
+a=3
+g=-2
+p = 0.1
 for i in range(NE):
-    ww_EE[i, :] = p*vonmises.pdf(2*pref_angles_p_exc, kappa_2, 2*pref_angles_p_exc[i])
+    ww_EE[:, i] = p*vonmises.pdf(2*pref_angles_p_exc, kappa_2, 2*pref_angles_p_exc[i])
     
 
+for i in range(NI):
+    ww_EI[:, i] = a*p*vonmises.pdf(2*pref_angles_p_exc, kappa_2, 2*pref_angles_p_inh[i])
+
 for i in range(NE):
-    ww_EI[i, :] = p*vonmises.pdf(2*pref_angles_p_exc, kappa_2, 2*pref_angles_p_inh[i])
+    ww_IE[:, i] = g*p*vonmises.pdf(2*pref_angles_p_inh, kappa_2, 2*pref_angles_p_exc[i])
 
 for i in range(NI):
-    ww_IE[i, :] = -2*p*vonmises.pdf(2*pref_angles_p_inh, kappa_2, 2*pref_angles_p_exc[i])
+    ww_II[:, i] = g*p*vonmises.pdf(2*pref_angles_p_inh, kappa_2, 2*pref_angles_p_inh[i])
 
-for i in range(NI):
-    ww_II[i, :] = -2*p*vonmises.pdf(2*pref_angles_p_inh, kappa_2, 2*pref_angles_p_inh[i])
+analyzer = NetworkAnalyzer(NE, NI, N_neurons, simtime, bin_width)
+m_plot = PlottingFuncs(N_neurons, simtime, bin_width, CE, CI)
 
-
-#ww_EE = ww_EE.tolist()
-#ww_EI = ww_EI.tolist()
-#ww_IE = ww_IE.tolist()
-#ww_II = ww_II.tolist()
-
-nu_th = theta / (J * CE * tauMem)
-nu_ex = eta * nu_th
-p_rate = 1000.0 * nu_ex * CE / 3
-'''
-# Create a figure with two subplots side by side
-fig, axes = plt.subplots(1, 2, figsize=(10, 5))
-
-# Plot the first array in the first subplot
-axes[0].imshow(ww_EI, cmap='viridis', interpolation='nearest')
-axes[0].set_title('Array 1')
-
-# Plot the second array in the second subplot
-axes[1].imshow(ww_IE, cmap='plasma', interpolation='nearest')
-axes[1].set_title('Array 2')
-
-# Add color bars (optional)
-for ax in axes:
-    ax.set_xticks([])
-    ax.set_yticks([])
-    ax.figure.colorbar(ax.images[0], ax=ax)
-
-# Adjust the layout
-plt.tight_layout()
-
-# Show the plot
-plt.show()
-'''
+print(np.max(ww_EE))
 
 def run_sim(random_seed, plotting_flag, sim):
     # Reset previous simulations
     nest.ResetKernel()
     # Set the number of threads you want to use
     num_threads = 10
-    # Set the kernel status to change the number of threads
+    # Set the kernel status to change the numbers of threads
     nest.SetKernelStatus({"local_num_threads": num_threads})
     # Set connection seed
     nest.SetKernelStatus({"rng_seed": connection_seed})
@@ -202,12 +117,10 @@ def run_sim(random_seed, plotting_flag, sim):
     nest.print_time = True
     nest.overwrite_files = True
 
-    if sim==True:
-        rates_exc = I_max/4
-        rates_inh = I_max/4
-    else:
-        rates_exc = I_max/4
-        rates_inh = I_max/4
+
+    rates_exc = I_max/4
+    rates_inh = I_max/4
+
 
     print("Building network")
     #Define Connection Parameters
@@ -216,12 +129,12 @@ def run_sim(random_seed, plotting_flag, sim):
     conn_params_ex = {"rule": "all_to_all"}
     conn_params_in = {"rule": "all_to_all"}
     #Define the Positions
-    pos_ex = nest.spatial.free(pos=nest.random.uniform(min=-3.0, max=3.0), num_dimensions=2)
+    pos_ex = nest.spatial.free(pos=nest.random.uniform(min=-5.0, max=5.0), num_dimensions=3)
     # Create excitatory neurons, inhibitory neurons, poisson spike generator, and spike recorders
     nodes_ex = nest.Create("iaf_psc_delta", NE, params=neuron_params, positions=pos_ex)
     nodes_in = nest.Create("iaf_psc_delta", NI, params=neuron_params, positions=pos_ex)
-    espikes = nest.Create("spike_recorder", params={"start": 3000.0, "stop":30000.0})
-    ispikes = nest.Create("spike_recorder", params={"start": 3000.0, "stop":30000.0})
+    espikes = nest.Create("spike_recorder", params={"start": 3000.0, "stop":simtime})
+    ispikes = nest.Create("spike_recorder", params={"start": 3000.0, "stop":simtime})
 
     #Define the Synapses
     nest.CopyModel("static_synapse", "excitatory", {"weight": J_ex, "delay": delay})
@@ -250,23 +163,37 @@ def run_sim(random_seed, plotting_flag, sim):
     nest.Connect(nodes_in, ispikes)
 
 
-    kl = abs(preferred_direction-pref_angles_p_exc)
-    min_arr = np.argmin(kl)
-    print(pref_angles_p_exc[min_arr])
+    #kl = abs(preferred_direction-pref_angles_p_exc)
+    #min_arr = np.argmin(kl)
+    #print(pref_angles_p_exc[min_arr])
+#
+    #src_id=min_arr+1    
 
-    src_id=min_arr+1    
+    abs_array = abs(preferred_direction-pref_angles_p_exc)
+    sorted_indices = np.argsort(abs_array)
+    src_indices = sorted_indices[0:10]
 
+    abs_array_inh = abs(preferred_direction-pref_angles_p_inh)
+    sorted_indices_inh = np.argsort(abs_array_inh)
+    src_indices_inh = sorted_indices_inh[0:1]
+    #src_indices = np.array([10, 70, 150, 230, 280])
     # 20.0, 5.0 2.5
-    base_amplitude=20.0
+    base_amplitude=10.0
     # Create Simulator and Connect it
-    t=0.1
-    amplitude= vonmises.pdf(2*pref_angles_p_exc, kappa_1, 2*pref_angles_p_exc[min_arr])
-    amplitude = t*amplitude*base_amplitude/np.max(amplitude)
 
-    print(np.max(amplitude))
+    src_id = src_indices+1
+
+ 
+    t=0.1
+    amplitude_exc= vonmises.pdf(2*pref_angles_p_exc, kappa_1, 2*pref_angles_p_exc[src_indices[0]])
+    amplitude_exc = t*amplitude_exc*base_amplitude/np.max(amplitude_exc)
+  
+    amplitude_inh= vonmises.pdf(2*pref_angles_p_inh, kappa_1, 2*pref_angles_p_inh[src_indices_inh[0]])
+    amplitude_inh = t*amplitude_inh*base_amplitude/np.max(amplitude_inh)
+
 
     #plt.figure()
-    #plt.plot(pref_angles_p_exc, amplitude)
+    #plt.plot(pref_angles_p_exc, amplitude_exc)
     #plt.xlabel("Stimulus Direction (radians)")
     #plt.ylabel("Current")
     #plt.title("von Mises Tuning Curve")
@@ -280,44 +207,31 @@ def run_sim(random_seed, plotting_flag, sim):
 
     
     
-    stim_params_1 = {"amplitude": 160.0, "start": 5150.0, "stop": 48150.0}
+    stim_params_1 = {"amplitude": 160.0, "start": 4000.0, "stop": simtime}
     stim_1= nest.Create("dc_generator", params=stim_params_1)
 
 
     # Connect the stimulator to the neuron
+    #for i in range(NE):
+    #        stim_params_exc = {"amplitude": amplitude_exc[i], "start": 5150.0, "stop": 48150.0}
+    #        stimulator_exc = nest.Create("dc_generator", params=stim_params_exc)
+    #        nest.Connect(stimulator_exc, nodes_ex[i])
+    #for i in range(NI):        
+    #    stim_params_inh = {"amplitude": amplitude_inh[i], "start": 5150.0, "stop": 48150.0}
+    #    stimulator_inh = nest.Create("dc_generator", params=stim_params_inh)
+    #    nest.Connect(stimulator_inh, nodes_in[i])
     
     if sim==True:
-        print('KK')
-        for i in range(400):
             
-            stim_params = {"amplitude": amplitude[i], "start": 5150.0, "stop": 48150.0}
-            stimulator = nest.Create("dc_generator", params=stim_params)
-            nest.Connect(stimulator, nodes_ex[i])
-            nest.Connect(stimulator, nodes_in[i])
-
-        nest.Connect(stim_1, nodes_ex[src_id-1])
         
-    ctr, src_id, targets_exc, targets_inh = analyzer.find_src_target_ids(nodes_ex, nodes_in)
-    src_id = min_arr+1
-    if (plotting_flag):
-        connectivity_target_matrix, connectivity_source_matrix = analyzer.create_connectivity(nodes_ex, nodes_in)
-        np.savetxt("connectivity_target.dat",connectivity_target_matrix,delimiter="\t",fmt="%1.4f")
-        np.savetxt("connectivity_source.dat",connectivity_source_matrix,delimiter="\t",fmt="%1.4f")
-        connectivity_01 = np.zeros((N_neurons, N_neurons))
-        connectivity_01[connectivity_target_matrix != 0] = 1
-        #connectivity_second_degree = connectivity_01 @ connectivity_01
-        #connectivity_third_degree = connectivity_second_degree @ connectivity_01
-        #src_id_conc = np.column_stack((connectivity_01[:, src_id-1], connectivity_second_degree[:, src_id-1], connectivity_third_degree[:, src_id-1]))
         
 
-        #np.savetxt("src_id_conc.dat",src_id_conc,delimiter="\t",fmt="%1.4f")
-        #np.savetxt("src_id_conc1.dat",connectivity_source_matrix[tt, :].T,delimiter="\t",fmt="%1.4f")
-        #np.savetxt("src_id_conc2.dat",connectivity_source_matrix[pp, :].T,delimiter="\t",fmt="%1.4f")
-        #print(connectivity_third_degree.shape)
-
+        for k in range(len(src_id)):
+            print(src_id)
+            nest.Connect(stim_1, nodes_ex[src_indices[k]])
+        
+    #ctr, src_id, targets_exc, targets_inh = analyzer.find_src_target_ids(nodes_ex, nodes_in)
     
-    print('Connectivity_done')
-
 
     # Start Simulation
     print("Simulating")
@@ -334,9 +248,6 @@ def run_sim(random_seed, plotting_flag, sim):
     num_synapses_ex = nest.GetDefaults("excitatory")["num_connections"]
     num_synapses_in = nest.GetDefaults("inhibitory")["num_connections"]
     num_synapses = num_synapses_ex + num_synapses_in
-
-
-
 
     # Extract spikes and plot raster plot
     sr1_spikes = espikes.events['senders']
@@ -366,11 +277,10 @@ def run_sim(random_seed, plotting_flag, sim):
     # Calculate CoV of inhibitory neurons
     CoV_inh = analyzer.calculate_CoV(spike_times_inh)
 
-
     # Calculating firing rates for both populations
-    hist_counts_all_exc, bin_centers_exc, avg_hist_counts_exc = analyzer.calculating_firing_rates(targets_exc, src_id, spike_times_exc, 0)
+    hist_counts_all_exc, bin_centers_exc, avg_hist_counts_exc = analyzer.calculating_firing_rates(src_id, spike_times_exc, 0)
 
-    hist_counts_all_inh, bin_centers_inh, avg_hist_counts_inh = analyzer.calculating_firing_rates(targets_inh, src_id, spike_times_inh, 1)
+    hist_counts_all_inh, bin_centers_inh, avg_hist_counts_inh = analyzer.calculating_firing_rates(src_id, spike_times_inh, 1)
 
     smoothed_data_exc = analyzer.smoothing_kernel(avg_hist_counts_exc)
     smoothed_data_inh = analyzer.smoothing_kernel(avg_hist_counts_inh)
@@ -380,7 +290,7 @@ def run_sim(random_seed, plotting_flag, sim):
     ss = np.squeeze(ss)
     #ll = np.ones(400)*stim_angle[src_id-1]
     diff = pref_angles_p_exc
-    diff_new = np.delete(diff, src_id-1)
+    diff_new = np.delete(diff, src_indices)
 
     diff_new_indices = np.argsort(diff_new)
     #plt.figure()
@@ -422,12 +332,11 @@ def run_sim(random_seed, plotting_flag, sim):
 
 
 
-analyzer = NetworkAnalyzer(NE, NI, N_neurons, simtime, bin_width)
-m_plot = PlottingFuncs(N_neurons, simtime, bin_width, CE, CI)
+
 
 plotting_flag = False
 # Define the number of runs
-num_runs = 4
+num_runs = 6
 
 # Lists to store the results
 nodes_ex = []
@@ -505,9 +414,16 @@ plt.plot(np.squeeze(dd_values), analyzer.smoothing_kernel(pp_nosim), label="nosi
 plt.plot(np.squeeze(dd_values), analyzer.smoothing_kernel(pp_sim), label="sim")
 plt.xlabel("Orientation Preference in Degrees")
 plt.ylabel("Average firing rate of neurons")
-plt.title("Stim Angle: {}".format(preferred_direction*180/np.pi))
+plt.title("Stim Angle: {} {} {}".format(preferred_direction*180/np.pi, a, g))
 plt.legend()
 
+#plt.figure()
+#plt.plot(np.squeeze(dd_values), analyzer.smoothing_kernel(pp_sim)-analyzer.smoothing_kernel(pp_nosim))
+#plt.xlabel("Orientation Preference in Degrees")
+#plt.ylabel("Firing rate difference")
+#plt.title("Stim Angle: {} {} {}".format(preferred_direction*180/np.pi, a, g))
+
+#print(analyzer.smoothing_kernel(pp_sim)-analyzer.smoothing_kernel(pp_nosim))
 plt.show()
 plt.close()
 
