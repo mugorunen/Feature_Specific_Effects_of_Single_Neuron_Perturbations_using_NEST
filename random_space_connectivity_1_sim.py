@@ -15,7 +15,7 @@ import nest
 import nest.raster_plot
 
 
-simtime = 20000.0  # Simulation time in ms
+simtime = 10000.0  # Simulation time in ms
 order = 400
 
 # Define Simulation Parameters
@@ -103,6 +103,8 @@ nest.Connect(stimulator, nodes_ex[src_id-1])
 tt = [i-1 for i in targets_exc]
 pp = [i-1 for i in targets_inh]
 
+voltmeter = nest.Create("voltmeter")
+nest.Connect(voltmeter, nodes_ex[2])
 
 print('Connectivity_done')
 # Start Simulation
@@ -122,6 +124,8 @@ sr1_times = espikes.events['times']
 sr2_spikes = ispikes.events['senders']
 sr2_times = ispikes.events['times']
 
+nest.voltage_trace.from_device(voltmeter)
+plt.show()
 
 # Calculate avg. firing rates of excitatory neurons
 avg_firing_exc, spike_times_exc = analyzer.calculate_avg_firing(nodes_ex, simtime, sr1_spikes, sr1_times, 0)

@@ -54,7 +54,7 @@ def run_sim(random_seed, plotting_flag):
     # Reset previous simulations
     nest.ResetKernel()
     # Set the number of threads you want to use
-    num_threads = 6
+    num_threads = 10
     # Set the kernel status to change the number of threads
     nest.SetKernelStatus({"local_num_threads": num_threads})
     # Set connection seed

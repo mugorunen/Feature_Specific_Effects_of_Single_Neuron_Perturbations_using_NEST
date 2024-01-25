@@ -6,13 +6,30 @@ from scipy.signal import convolve2d
 from scipy.signal import convolve
 import nest
 
+# The file to analyze the activity of the neurons
 class NetworkAnalyzer:
+    # Initialization of the values
     def __init__(self, NE, NI, N_neurons, simtime, bin_width):
         self.NE = NE
         self.NI = NI
         self.N_neurons = N_neurons
         self.simtime = simtime
         self.bin_width = bin_width
+
+    # Calculation of average firing rate
+    def calculate_avg_firing_target(self, pop, target_ids, sim_time, spikes, times, flag):
+        
+        firing_rates = []
+        spike_times = []
+        for neuron_id in target_ids:
+            spikes_for_neuron = np.sum(spikes == neuron_id)
+            firing_rate = spikes_for_neuron / (sim_time / 1000)  # Convert to Hz
+            firing_rates.append(firing_rate)
+            time_indices = np.where(spikes == neuron_id)[0]
+            time_values = times[time_indices]
+            spike_times.append(time_values)
+        average_firing_rate = np.mean(firing_rates)
+        return average_firing_rate, spike_times
 
     def calculate_avg_firing(self, pop, sim_time, spikes, times, flag):
         if flag == 0:
@@ -31,6 +48,7 @@ class NetworkAnalyzer:
         average_firing_rate = np.mean(firing_rates)
         return average_firing_rate, spike_times
 
+    # Calculate coefficient of variance
     def calculate_CoV(self, spike_times):
         consecutive_diffs = [np.diff(sublist) for sublist in spike_times]
         mean_isi = [np.mean(sublist) for sublist in consecutive_diffs]
@@ -38,6 +56,8 @@ class NetworkAnalyzer:
         CoV = [a / b for a, b in zip(std_isi, mean_isi)]
         return CoV
 
+
+    # Create connecticity according to results. Not being used in the main code
     def create_connectivity(self, nodes_ex, nodes_in):
         connectivity_target = np.zeros((self.N_neurons, self.N_neurons))
         connectivity_source = np.zeros((self.N_neurons, self.N_neurons))
@@ -63,22 +83,27 @@ class NetworkAnalyzer:
         connectivity_source_matrix = connectivity_source.T
         return connectivity_target_matrix, connectivity_source_matrix
     
-    def calculating_firing_rates(self, targets, src_id, spike_times, neuron_type):
+    # Calculate firing rate for each neuron
+    def calculating_firing_rates(self, src_id, spike_times, neuron_type):
          # Plot the mean firing rate of the Excitatory Neurons Connected to the Perturbed One
         hist_counts_all = []
         elep_spike_times=[]
+        if neuron_type==0:
+            num = self.NE
+        else:
+            num = self.NI
         #targets_exc.remove(src_id)
-        for i in targets:
-            if i==src_id and neuron_type==0:
-                data = spike_times[i-1]
+        for i in range(num):
+            if np.any(i+1 == src_id):
+                data = spike_times[i]
             elif neuron_type==0:
-                data = spike_times[i-1]
+                data = spike_times[i]
                 elep_spike_times.append(data)
                 num_bins = int(self.simtime/self.bin_width)
                 hist_counts, hist_edges = np.histogram(data, bins=num_bins, range=(min(data), max(data)))
                 hist_counts_all.append(hist_counts/(self.bin_width/1000))
             elif neuron_type==1:
-                data = spike_times[i-self.NE-1]
+                data = spike_times[i]
                 elep_spike_times.append(data)
                 num_bins = int(self.simtime/self.bin_width)
                 hist_counts, hist_edges = np.histogram(data, bins=num_bins, range=(min(data), max(data)))
@@ -89,9 +114,10 @@ class NetworkAnalyzer:
         avg_hist_counts = hist_counts_all.T.mean(axis=1)
 
 
-
         return hist_counts_all, bin_centers, avg_hist_counts
     
+
+    # Smoothing kernel to better visualize the data
     def smoothing_kernel(self, mean_hist):
         # Define the smoothing kernel (e.g., Gaussian kernel)
         kernel_size = 40  # Adjust the size of the kernel as needed
@@ -114,6 +140,7 @@ class NetworkAnalyzer:
         
         return smoothed_padded_data
     
+    # Find the target of the neuron
     def find_src_target_ids(self, nodes_ex, nodes_in):
         ctr = nest.FindCenterElement(nodes_ex)
         src_id = int(ctr.tolist()[0])
@@ -126,6 +153,7 @@ class NetworkAnalyzer:
 
         return ctr, src_id, targets_exc, targets_inh
     
+    # Find the neurons that do not have direct connection to perturbed one
     def get_nodes_2_nodes_away(self, ctr, neuron_id, targets, nodes_ex, nodes_in, neuron_type):
 
         if neuron_type==0:

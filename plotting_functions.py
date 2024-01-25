@@ -6,13 +6,17 @@ from matplotlib.colors import Normalize, LogNorm
 from matplotlib.cm import ScalarMappable
 import nest
 
+# This script contains functions to plot different behaviors
 class PlottingFuncs:
+    # Initialization of the values
     def __init__(self, N_neurons, simtime, bin_width, CE, CI):
         self.N_neurons = N_neurons
         self.simtime = simtime
         self.bin_width = bin_width
         self.CE = CE
         self.CI = CI
+
+    #Plotting which neurons to connecting to which other neurons
     def plot_spatial_connections(self, nodes_ex, ctr):
         fig1 = nest.PlotLayer(nodes_ex)
         nest.PlotTargets(
@@ -51,6 +55,7 @@ class PlottingFuncs:
         plt.axis([-2.0, 2.0, -2.0, 2.0])
         plt.title("Connection targets")
 
+    # PLotting of the connectivity matrix
     def plot_connectivity(self, connectivity_matrix):
         # Normalize the values for colormap mapping
         # Plot the array using imshow
@@ -60,6 +65,7 @@ class PlottingFuncs:
         colorbar = plt.colorbar()
         colorbar.set_label('Value')
 
+    # Plotting the raster plot
     def plot_raster_plot(self, sr1_spikes, sr1_times, sr2_spikes, sr2_times):
         plt.figure()
 
@@ -82,6 +88,7 @@ class PlottingFuncs:
         else:
             plt.title("CV of Inhibitory Neurons")
 
+
     def plot_hist_perturbed(self, spike_times_exc, src_id):
         spike_times_exc = np.array(spike_times_exc)
         #Plot the histogram of the Perturbed Neuron
@@ -92,7 +99,6 @@ class PlottingFuncs:
         plt.ylabel("Frequency")
         plt.title("Histogram of the Stimulated Neuron")
 
-    
     def plot_avg_firing_rate(self, bin_centers, avg_hist_counts, average_firing_rate, neuron_type):
         plt.figure()
         plt.plot(bin_centers, avg_hist_counts)
@@ -111,7 +117,7 @@ class PlottingFuncs:
         plt.plot(bin_centers, average_firing_rate, color='blue')
         plt.grid(True)
 
-    
+    # Plot the activity of just one neuron
     def plot_example_neuron(self, bin_centers, hist_count_one_neuron, firing_rates_smoothed_one_neuron, neuron_type):
         plt.figure()
         plt.plot(bin_centers, hist_count_one_neuron)
